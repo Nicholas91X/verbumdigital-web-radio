@@ -53,6 +53,7 @@ func main() {
 	authService := services.NewAuthService(db)
 	priestService := services.NewPriestService(db)
 	userService := services.NewUserService(db, cfg.IcecastBaseURL)
+	adminService := services.NewAdminService(db)
 
 	// =====================
 	// HANDLERS
@@ -60,6 +61,7 @@ func main() {
 	authHandler := handlers.NewAuthHandler(authService, cfg.JWTSecret, jwtExpHours)
 	priestHandler := handlers.NewPriestHandler(priestService)
 	userHandler := handlers.NewUserHandler(userService)
+	adminHandler := handlers.NewAdminHandler(adminService)
 	deviceHandler := handlers.NewDeviceHandler(db)
 
 	// =====================
@@ -85,17 +87,17 @@ func main() {
 		admin := v1.Group("/admin")
 		admin.Use(auth, middleware.RequireRole(middleware.RoleAdmin))
 		{
-			admin.GET("/machines", placeholder("list machines"))
-			admin.POST("/machines", placeholder("create machine"))
-			admin.PUT("/machines/:id", placeholder("update machine"))
-			admin.PUT("/machines/:id/activate", placeholder("activate machine"))
-			admin.PUT("/machines/:id/deactivate", placeholder("deactivate machine"))
-			admin.GET("/churches", placeholder("list churches"))
-			admin.POST("/churches", placeholder("create church"))
-			admin.PUT("/churches/:id", placeholder("update church"))
-			admin.GET("/priests", placeholder("list priests"))
-			admin.POST("/priests", placeholder("create priest"))
-			admin.GET("/sessions", placeholder("list sessions"))
+			admin.GET("/machines", adminHandler.ListMachines)
+			admin.POST("/machines", adminHandler.CreateMachine)
+			admin.PUT("/machines/:id", adminHandler.UpdateMachine)
+			admin.PUT("/machines/:id/activate", adminHandler.ActivateMachine)
+			admin.PUT("/machines/:id/deactivate", adminHandler.DeactivateMachine)
+			admin.GET("/churches", adminHandler.ListChurches)
+			admin.POST("/churches", adminHandler.CreateChurch)
+			admin.PUT("/churches/:id", adminHandler.UpdateChurch)
+			admin.GET("/priests", adminHandler.ListPriests)
+			admin.POST("/priests", adminHandler.CreatePriest)
+			admin.GET("/sessions", adminHandler.ListSessions)
 		}
 
 		// PRIEST
@@ -136,13 +138,5 @@ func main() {
 	log.Printf("Server starting on %s", addr)
 	if err := r.Run(addr); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
-	}
-}
-
-func placeholder(name string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.JSON(501, gin.H{
-			"message": fmt.Sprintf("[%s] Not implemented yet", name),
-		})
 	}
 }
