@@ -25,6 +25,7 @@ type Config struct {
 
 	// ST1 / Icecast
 	IcecastBaseURL string
+	DeviceAPIKey   string
 }
 
 func Load() (*Config, error) {
@@ -42,6 +43,7 @@ func Load() (*Config, error) {
 		JWTSecret:          getEnv("JWT_SECRET", ""),
 		JWTExpirationHours: getEnv("JWT_EXPIRATION_HOURS", "72"),
 		IcecastBaseURL:     getEnv("ICECAST_BASE_URL", "http://vdserv.com:8000"),
+		DeviceAPIKey:       getEnv("DEVICE_API_KEY", ""),
 	}
 
 	if cfg.DBPassword == "" {
@@ -49,6 +51,9 @@ func Load() (*Config, error) {
 	}
 	if cfg.JWTSecret == "" {
 		return nil, fmt.Errorf("JWT_SECRET is required")
+	}
+	if cfg.DeviceAPIKey == "" {
+		return nil, fmt.Errorf("DEVICE_API_KEY is required")
 	}
 
 	return cfg, nil

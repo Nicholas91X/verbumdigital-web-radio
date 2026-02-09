@@ -3,9 +3,11 @@ package main
 import (
 	"fmt"
 	"log"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/verbumdigital/web-radio/internal/config"
+	"github.com/verbumdigital/web-radio/internal/middleware"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -32,11 +34,19 @@ func main() {
 	}
 	defer sqlDB.Close()
 
-	// Verify connection
 	if err := sqlDB.Ping(); err != nil {
 		log.Fatalf("Failed to ping database: %v", err)
 	}
 	log.Println("Database connected successfully")
+
+	// Parse JWT expiration
+	jwtExpHours, _ := strconv.Atoi(cfg.JWTExpirationHours)
+	if jwtExpHours == 0 {
+		jwtExpHours = 72
+	}
+	// Store for later injection into handlers
+	_ = jwtExpHours
+	_ = db
 
 	// Setup router
 	r := gin.Default()
@@ -46,17 +56,24 @@ func main() {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	// API v1 route groups (handlers will be added in next steps)
+	// Auth middleware instance
+	auth := middleware.AuthMiddleware(cfg.JWTSecret)
+
 	v1 := r.Group("/api/v1")
 	{
-		// Public routes (no auth)
+		// =====================
+		// PUBLIC (no auth)
+		// =====================
 		v1.POST("/auth/admin/login", placeholder("admin login"))
 		v1.POST("/auth/priest/login", placeholder("priest login"))
 		v1.POST("/auth/user/login", placeholder("user login"))
 		v1.POST("/auth/user/register", placeholder("user register"))
 
-		// Admin routes
+		// =====================
+		// ADMIN (JWT + role check)
+		// =====================
 		admin := v1.Group("/admin")
+		admin.Use(auth, middleware.RequireRole(middleware.RoleAdmin))
 		{
 			admin.GET("/machines", placeholder("list machines"))
 			admin.POST("/machines", placeholder("create machine"))
@@ -74,8 +91,11 @@ func main() {
 			admin.GET("/sessions", placeholder("list sessions"))
 		}
 
-		// Priest routes
+		// =====================
+		// PRIEST (JWT + role check)
+		// =====================
 		priest := v1.Group("/priest")
+		priest.Use(auth, middleware.RequireRole(middleware.RolePriest))
 		{
 			priest.GET("/churches", placeholder("priest's churches"))
 			priest.GET("/churches/:id/stream/status", placeholder("stream status"))
@@ -84,8 +104,11 @@ func main() {
 			priest.GET("/churches/:id/sessions", placeholder("session history"))
 		}
 
-		// User routes
+		// =====================
+		// USER (JWT + role check)
+		// =====================
 		user := v1.Group("/user")
+		user.Use(auth, middleware.RequireRole(middleware.RoleUser))
 		{
 			user.GET("/churches", placeholder("browse churches"))
 			user.GET("/churches/:id", placeholder("church detail"))
@@ -95,8 +118,11 @@ func main() {
 			user.GET("/stream/:stream_id", placeholder("get stream URL"))
 		}
 
-		// ST1 device-to-server endpoints
+		// =====================
+		// DEVICE - ST1 (API key auth)
+		// =====================
 		device := v1.Group("/device")
+		device.Use(middleware.DeviceAuth(cfg.DeviceAPIKey))
 		{
 			device.POST("/validate", placeholder("validate stream credentials"))
 			device.POST("/stream/started", placeholder("notify stream started"))
@@ -112,7 +138,6 @@ func main() {
 	}
 }
 
-// placeholder returns a temporary handler that shows the route is registered
 func placeholder(name string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.JSON(501, gin.H{
