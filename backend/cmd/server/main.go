@@ -7,7 +7,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/verbumdigital/web-radio/internal/config"
+	"github.com/verbumdigital/web-radio/internal/handlers"
 	"github.com/verbumdigital/web-radio/internal/middleware"
+	"github.com/verbumdigital/web-radio/internal/services"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -39,39 +41,45 @@ func main() {
 	}
 	log.Println("Database connected successfully")
 
-	// Parse JWT expiration
+	// JWT config
 	jwtExpHours, _ := strconv.Atoi(cfg.JWTExpirationHours)
 	if jwtExpHours == 0 {
 		jwtExpHours = 72
 	}
-	// Store for later injection into handlers
-	_ = jwtExpHours
-	_ = db
 
-	// Setup router
+	// =====================
+	// SERVICES
+	// =====================
+	authService := services.NewAuthService(db)
+	priestService := services.NewPriestService(db)
+
+	// =====================
+	// HANDLERS
+	// =====================
+	authHandler := handlers.NewAuthHandler(authService, cfg.JWTSecret, jwtExpHours)
+	priestHandler := handlers.NewPriestHandler(priestService)
+	deviceHandler := handlers.NewDeviceHandler(db)
+
+	// =====================
+	// ROUTER
+	// =====================
 	r := gin.Default()
 
-	// Health check
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	// Auth middleware instance
 	auth := middleware.AuthMiddleware(cfg.JWTSecret)
 
 	v1 := r.Group("/api/v1")
 	{
-		// =====================
-		// PUBLIC (no auth)
-		// =====================
-		v1.POST("/auth/admin/login", placeholder("admin login"))
-		v1.POST("/auth/priest/login", placeholder("priest login"))
-		v1.POST("/auth/user/login", placeholder("user login"))
-		v1.POST("/auth/user/register", placeholder("user register"))
+		// PUBLIC
+		v1.POST("/auth/admin/login", authHandler.AdminLogin)
+		v1.POST("/auth/priest/login", authHandler.PriestLogin)
+		v1.POST("/auth/user/login", authHandler.UserLogin)
+		v1.POST("/auth/user/register", authHandler.UserRegister)
 
-		// =====================
-		// ADMIN (JWT + role check)
-		// =====================
+		// ADMIN
 		admin := v1.Group("/admin")
 		admin.Use(auth, middleware.RequireRole(middleware.RoleAdmin))
 		{
@@ -80,33 +88,26 @@ func main() {
 			admin.PUT("/machines/:id", placeholder("update machine"))
 			admin.PUT("/machines/:id/activate", placeholder("activate machine"))
 			admin.PUT("/machines/:id/deactivate", placeholder("deactivate machine"))
-
 			admin.GET("/churches", placeholder("list churches"))
 			admin.POST("/churches", placeholder("create church"))
 			admin.PUT("/churches/:id", placeholder("update church"))
-
 			admin.GET("/priests", placeholder("list priests"))
 			admin.POST("/priests", placeholder("create priest"))
-
 			admin.GET("/sessions", placeholder("list sessions"))
 		}
 
-		// =====================
-		// PRIEST (JWT + role check)
-		// =====================
+		// PRIEST
 		priest := v1.Group("/priest")
 		priest.Use(auth, middleware.RequireRole(middleware.RolePriest))
 		{
-			priest.GET("/churches", placeholder("priest's churches"))
-			priest.GET("/churches/:id/stream/status", placeholder("stream status"))
-			priest.POST("/churches/:id/stream/start", placeholder("start stream"))
-			priest.POST("/churches/:id/stream/stop", placeholder("stop stream"))
-			priest.GET("/churches/:id/sessions", placeholder("session history"))
+			priest.GET("/churches", priestHandler.GetChurches)
+			priest.GET("/churches/:id/stream/status", priestHandler.GetStreamStatus)
+			priest.POST("/churches/:id/stream/start", priestHandler.StartStream)
+			priest.POST("/churches/:id/stream/stop", priestHandler.StopStream)
+			priest.GET("/churches/:id/sessions", priestHandler.GetSessions)
 		}
 
-		// =====================
-		// USER (JWT + role check)
-		// =====================
+		// USER
 		user := v1.Group("/user")
 		user.Use(auth, middleware.RequireRole(middleware.RoleUser))
 		{
@@ -118,19 +119,16 @@ func main() {
 			user.GET("/stream/:stream_id", placeholder("get stream URL"))
 		}
 
-		// =====================
-		// DEVICE - ST1 (API key auth)
-		// =====================
+		// DEVICE (ST1)
 		device := v1.Group("/device")
 		device.Use(middleware.DeviceAuth(cfg.DeviceAPIKey))
 		{
-			device.POST("/validate", placeholder("validate stream credentials"))
-			device.POST("/stream/started", placeholder("notify stream started"))
-			device.POST("/stream/stopped", placeholder("notify stream stopped"))
+			device.POST("/validate", deviceHandler.Validate)
+			device.POST("/stream/started", deviceHandler.StreamStarted)
+			device.POST("/stream/stopped", deviceHandler.StreamStopped)
 		}
 	}
 
-	// Start server
 	addr := fmt.Sprintf(":%s", cfg.Port)
 	log.Printf("Server starting on %s", addr)
 	if err := r.Run(addr); err != nil {
