@@ -52,12 +52,14 @@ func main() {
 	// =====================
 	authService := services.NewAuthService(db)
 	priestService := services.NewPriestService(db)
+	userService := services.NewUserService(db, cfg.IcecastBaseURL)
 
 	// =====================
 	// HANDLERS
 	// =====================
 	authHandler := handlers.NewAuthHandler(authService, cfg.JWTSecret, jwtExpHours)
 	priestHandler := handlers.NewPriestHandler(priestService)
+	userHandler := handlers.NewUserHandler(userService)
 	deviceHandler := handlers.NewDeviceHandler(db)
 
 	// =====================
@@ -111,12 +113,13 @@ func main() {
 		user := v1.Group("/user")
 		user.Use(auth, middleware.RequireRole(middleware.RoleUser))
 		{
-			user.GET("/churches", placeholder("browse churches"))
-			user.GET("/churches/:id", placeholder("church detail"))
-			user.POST("/churches/:id/subscribe", placeholder("subscribe"))
-			user.DELETE("/churches/:id/subscribe", placeholder("unsubscribe"))
-			user.GET("/subscriptions", placeholder("my subscriptions"))
-			user.GET("/stream/:stream_id", placeholder("get stream URL"))
+			user.GET("/churches", userHandler.GetChurches)
+			user.GET("/churches/:id", userHandler.GetChurch)
+			user.POST("/churches/:id/subscribe", userHandler.Subscribe)
+			user.DELETE("/churches/:id/subscribe", userHandler.Unsubscribe)
+			user.PUT("/churches/:id/notifications", userHandler.UpdateNotifications)
+			user.GET("/subscriptions", userHandler.GetSubscriptions)
+			user.GET("/stream/:stream_id", userHandler.GetStreamURL)
 		}
 
 		// DEVICE (ST1)
