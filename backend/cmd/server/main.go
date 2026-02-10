@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/verbumdigital/web-radio/internal/config"
 	"github.com/verbumdigital/web-radio/internal/handlers"
@@ -68,6 +70,24 @@ func main() {
 	// ROUTER
 	// =====================
 	r := gin.Default()
+
+	// CORS — allow PWA origins (dev + production)
+	r.Use(cors.New(cors.Config{
+		AllowOrigins: []string{
+			"http://localhost:3000", // Admin PWA (dev)
+			"http://localhost:3001", // Priest PWA (dev)
+			"http://localhost:3002", // User PWA (dev)
+			// Production domains — add here when ready:
+			// "https://admin.verbumdigital.com",
+			// "https://priest.verbumdigital.com",
+			// "https://app.verbumdigital.com",
+		},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Device-Key"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
