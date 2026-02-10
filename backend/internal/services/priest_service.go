@@ -17,7 +17,7 @@ func NewPriestService(db *gorm.DB) *PriestService {
 }
 
 // GetChurches returns all churches managed by the priest
-func (s *PriestService) GetChurches(priestID uint) ([]models.Church, error) {
+func (s *PriestService) GetChurches(priestID int) ([]models.Church, error) {
 	var priest models.Priest
 	if err := s.DB.Preload("Churches").First(&priest, priestID).Error; err != nil {
 		return nil, err
@@ -26,7 +26,7 @@ func (s *PriestService) GetChurches(priestID uint) ([]models.Church, error) {
 }
 
 // GetStreamStatus returns current streaming status and credentials
-func (s *PriestService) GetStreamStatus(priestID, churchID uint) (map[string]interface{}, error) {
+func (s *PriestService) GetStreamStatus(priestID, churchID int) (map[string]interface{}, error) {
 	if !s.isPriestOfChurch(priestID, churchID) {
 		return nil, errors.New("church not found or access denied")
 	}
@@ -44,7 +44,7 @@ func (s *PriestService) GetStreamStatus(priestID, churchID uint) (map[string]int
 }
 
 // StartStream initializes a new streaming session
-func (s *PriestService) StartStream(priestID, churchID uint) (*models.StreamingSession, error) {
+func (s *PriestService) StartStream(priestID, churchID int) (*models.StreamingSession, error) {
 	if !s.isPriestOfChurch(priestID, churchID) {
 		return nil, errors.New("church not found or access denied")
 	}
@@ -91,7 +91,7 @@ func (s *PriestService) StartStream(priestID, churchID uint) (*models.StreamingS
 }
 
 // StopStream ends an active streaming session
-func (s *PriestService) StopStream(priestID, churchID uint) (*models.StreamingSession, error) {
+func (s *PriestService) StopStream(priestID, churchID int) (*models.StreamingSession, error) {
 	if !s.isPriestOfChurch(priestID, churchID) {
 		return nil, errors.New("church not found or access denied")
 	}
@@ -139,7 +139,7 @@ func (s *PriestService) StopStream(priestID, churchID uint) (*models.StreamingSe
 }
 
 // GetSessions returns session history for a church
-func (s *PriestService) GetSessions(priestID, churchID uint, limit int) ([]models.StreamingSession, error) {
+func (s *PriestService) GetSessions(priestID, churchID int, limit int) ([]models.StreamingSession, error) {
 	if !s.isPriestOfChurch(priestID, churchID) {
 		return nil, errors.New("church not found or access denied")
 	}
@@ -153,7 +153,7 @@ func (s *PriestService) GetSessions(priestID, churchID uint, limit int) ([]model
 }
 
 // isPriestOfChurch checks if a priest has access to a church
-func (s *PriestService) isPriestOfChurch(priestID, churchID uint) bool {
+func (s *PriestService) isPriestOfChurch(priestID, churchID int) bool {
 	var count int64
 	s.DB.Table("priest_churches").Where("priest_id = ? AND church_id = ?", priestID, churchID).Count(&count)
 	return count > 0

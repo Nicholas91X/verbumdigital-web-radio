@@ -6,12 +6,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// parseUintParam is a helper to get a uint ID from a URL parameter
-func parseUintParam(c *gin.Context, name string) (uint, error) {
+// parseIntParam is a helper to get an int ID from a URL parameter
+func parseIntParam(c *gin.Context, name string) (int, error) {
 	val := c.Param(name)
-	id, err := strconv.ParseUint(val, 10, 32)
+	id, err := strconv.Atoi(val)
 	if err != nil {
 		return 0, err
 	}
-	return uint(id), nil
+	return id, nil
 }

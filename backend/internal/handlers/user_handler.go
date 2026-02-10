@@ -17,13 +17,12 @@ func NewUserHandler(userService *services.UserService) *UserHandler {
 }
 
 // ============================================
-// GET /user/churches?search=...
-// Browse all churches (with optional search)
+// GET /churches
+// Returns all churches
 // ============================================
 
 func (h *UserHandler) GetChurches(c *gin.Context) {
 	search := c.Query("search")
-
 	churches, err := h.UserService.GetChurches(search)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch churches"})
@@ -34,12 +33,12 @@ func (h *UserHandler) GetChurches(c *gin.Context) {
 }
 
 // ============================================
-// GET /user/churches/:id
-// Church detail with subscriber count
+// GET /churches/:id
+// Returns a single church
 // ============================================
 
 func (h *UserHandler) GetChurch(c *gin.Context) {
-	churchID, err := parseUintParam(c, "id")
+	churchID, err := parseIntParam(c, "id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid church ID"})
 		return
@@ -59,13 +58,12 @@ func (h *UserHandler) GetChurch(c *gin.Context) {
 }
 
 // ============================================
-// POST /user/churches/:id/subscribe
-// Subscribe to a church
+// POST /churches/:id/subscribe
 // ============================================
 
 func (h *UserHandler) Subscribe(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	churchID, err := parseUintParam(c, "id")
+	churchID, err := parseIntParam(c, "id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid church ID"})
 		return
@@ -73,14 +71,11 @@ func (h *UserHandler) Subscribe(c *gin.Context) {
 
 	sub, err := h.UserService.Subscribe(userID, churchID)
 	if err != nil {
-		switch err.Error() {
-		case "church not found":
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		case "already subscribed":
+		if err.Error() == "already subscribed" {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to subscribe"})
+			return
 		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to subscribe"})
 		return
 	}
 
@@ -91,13 +86,12 @@ func (h *UserHandler) Subscribe(c *gin.Context) {
 }
 
 // ============================================
-// DELETE /user/churches/:id/subscribe
-// Unsubscribe from a church
+// POST /churches/:id/unsubscribe
 // ============================================
 
 func (h *UserHandler) Unsubscribe(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	churchID, err := parseUintParam(c, "id")
+	churchID, err := parseIntParam(c, "id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid church ID"})
 		return
@@ -116,8 +110,8 @@ func (h *UserHandler) Unsubscribe(c *gin.Context) {
 }
 
 // ============================================
-// GET /user/subscriptions
-// List all user's subscriptions with church info and live status
+// GET /subscriptions
+// Returns all user subscriptions
 // ============================================
 
 func (h *UserHandler) GetSubscriptions(c *gin.Context) {
@@ -133,21 +127,22 @@ func (h *UserHandler) GetSubscriptions(c *gin.Context) {
 }
 
 // ============================================
-// PUT /user/churches/:id/notifications
-// Toggle notification preference for a subscription
+// PATCH /subscriptions/:id/notifications
 // ============================================
+
+type NotificationUpdate struct {
+	Enabled bool `json:"enabled"`
+}
 
 func (h *UserHandler) UpdateNotifications(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	churchID, err := parseUintParam(c, "id")
+	churchID, err := parseIntParam(c, "id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid church ID"})
 		return
 	}
 
-	var req struct {
-		Enabled bool `json:"enabled"`
-	}
+	var req NotificationUpdate
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -158,7 +153,7 @@ func (h *UserHandler) UpdateNotifications(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update preference"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update notification settings"})
 		return
 	}
 
@@ -166,26 +161,26 @@ func (h *UserHandler) UpdateNotifications(c *gin.Context) {
 }
 
 // ============================================
-// GET /user/stream/:stream_id
-// Get the Icecast stream URL (must be subscribed)
+// GET /stream/:stream_id
 // ============================================
 
 func (h *UserHandler) GetStreamURL(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	streamID := c.Param("stream_id")
 
-	result, err := h.UserService.GetStreamURL(userID, streamID)
+	stream, err := h.UserService.GetStreamURL(userID, streamID)
 	if err != nil {
-		switch err.Error() {
-		case "stream not found":
+		if err.Error() == "stream not found" {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		case "not subscribed to this church":
-			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get stream"})
+			return
 		}
+		if err.Error() == "not subscribed to this church" {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get stream info"})
 		return
 	}
 
-	c.JSON(http.StatusOK, result)
+	c.JSON(http.StatusOK, stream)
 }

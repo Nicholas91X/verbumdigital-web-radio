@@ -19,7 +19,7 @@ const (
 
 // JWT claims
 type Claims struct {
-	UserID uint   `json:"user_id"`
+	UserID int    `json:"user_id"`
 	Email  string `json:"email"`
 	Role   string `json:"role"`
 	jwt.RegisteredClaims
@@ -112,7 +112,7 @@ func DeviceAuth(apiKey string) gin.HandlerFunc {
 }
 
 // GenerateToken creates a JWT for a given user/role
-func GenerateToken(userID uint, email string, role string, jwtSecret string, expirationHours int) (string, error) {
+func GenerateToken(userID int, email string, role string, jwtSecret string, expirationHours int) (string, error) {
 	now := time.Now()
 
 	claims := &Claims{
@@ -131,9 +131,9 @@ func GenerateToken(userID uint, email string, role string, jwtSecret string, exp
 }
 
 // Helper: extract user ID from context
-func GetUserID(c *gin.Context) uint {
+func GetUserID(c *gin.Context) int {
 	id, _ := c.Get("user_id")
-	return id.(uint)
+	return id.(int)
 }
 
 // Helper: extract role from context

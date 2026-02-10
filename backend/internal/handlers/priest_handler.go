@@ -41,7 +41,7 @@ func (h *PriestHandler) GetChurches(c *gin.Context) {
 
 func (h *PriestHandler) GetStreamStatus(c *gin.Context) {
 	priestID := middleware.GetUserID(c)
-	churchID, err := parseUintParam(c, "id")
+	churchID, err := parseIntParam(c, "id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid church ID"})
 		return
@@ -63,17 +63,11 @@ func (h *PriestHandler) GetStreamStatus(c *gin.Context) {
 // ============================================
 // POST /priest/churches/:id/stream/start
 // Creates session, returns credentials for ST1
-//
-// Flow:
-// 1. Priest PWA calls this endpoint
-// 2. Backend creates session, returns stream credentials
-// 3. Priest PWA sends play + stream_url to ST1 (local smixRest)
-// 4. ST1 validates with backend and starts encoding
 // ============================================
 
 func (h *PriestHandler) StartStream(c *gin.Context) {
 	priestID := middleware.GetUserID(c)
-	churchID, err := parseUintParam(c, "id")
+	churchID, err := parseIntParam(c, "id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid church ID"})
 		return
@@ -103,16 +97,11 @@ func (h *PriestHandler) StartStream(c *gin.Context) {
 // ============================================
 // POST /priest/churches/:id/stream/stop
 // Ends session, updates church status
-//
-// Flow:
-// 1. Priest PWA sends stop to ST1 (local smixRest)
-// 2. Priest PWA calls this endpoint
-// 3. Backend ends session, clears streaming_active
 // ============================================
 
 func (h *PriestHandler) StopStream(c *gin.Context) {
 	priestID := middleware.GetUserID(c)
-	churchID, err := parseUintParam(c, "id")
+	churchID, err := parseIntParam(c, "id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid church ID"})
 		return
@@ -144,7 +133,7 @@ func (h *PriestHandler) StopStream(c *gin.Context) {
 
 func (h *PriestHandler) GetSessions(c *gin.Context) {
 	priestID := middleware.GetUserID(c)
-	churchID, err := parseUintParam(c, "id")
+	churchID, err := parseIntParam(c, "id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid church ID"})
 		return
