@@ -1,40 +1,186 @@
-/**
- * Tipi condivisi per l'API
- */
+// ============================================
+// MODELS (matching Go structs)
+// ============================================
 
-// User types
-export interface User {
-    id: string;
-    email: string;
-    name: string;
-    role: 'admin' | 'priest' | 'user';
-    createdAt: string;
-    updatedAt: string;
+export interface Machine {
+    id: number;
+    machine_id: string;
+    activated: boolean;
+    activation_code?: string;
+    activated_at?: string;
+    created_at: string;
+    updated_at: string;
+    church?: Church;
 }
 
-// Auth types
+export interface Church {
+    id: number;
+    machine_id?: number;
+    name: string;
+    logo_url?: string;
+    address?: string;
+    streaming_active: boolean;
+    current_session_id?: number;
+    created_at: string;
+    updated_at: string;
+    machine?: Machine;
+    streaming_credential?: StreamingCredential;
+    current_session?: StreamingSession;
+    priests?: Priest[];
+}
+
+export interface StreamingCredential {
+    id: number;
+    church_id: number;
+    stream_id: string;
+    stream_key: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface Priest {
+    id: number;
+    name: string;
+    email: string;
+    created_at: string;
+    updated_at: string;
+    churches?: PriestChurch[];
+}
+
+export interface PriestChurch {
+    priest_id: number;
+    church_id: number;
+    church?: Church;
+}
+
+export interface User {
+    id: number;
+    name: string;
+    email: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface UserSubscription {
+    id: number;
+    user_id: number;
+    church_id: number;
+    notifications_enabled: boolean;
+    created_at: string;
+    updated_at: string;
+    church?: Church;
+}
+
+export interface Admin {
+    id: number;
+    username: string;
+    email: string;
+    created_at: string;
+}
+
+export interface StreamingSession {
+    id: number;
+    church_id: number;
+    started_by_priest_id?: number;
+    started_at: string;
+    ended_at?: string;
+    duration_seconds?: number;
+    recording_url?: string;
+    max_listener_count: number;
+    created_at: string;
+    church?: Church;
+    priest?: Priest;
+}
+
+// ============================================
+// AUTH
+// ============================================
+
 export interface LoginRequest {
     email: string;
     password: string;
 }
 
-export interface LoginResponse {
+export interface RegisterRequest {
+    name: string;
+    email: string;
+    password: string;
+}
+
+export interface AuthResponse {
     token: string;
-    user: User;
+    user: {
+        id: number;
+        name?: string;
+        username?: string;
+        email: string;
+        role: 'admin' | 'priest' | 'user';
+    };
 }
 
-// API Response wrapper
-export interface ApiResponse<T> {
-    success: boolean;
-    data?: T;
-    error?: string;
+// ============================================
+// API RESPONSES
+// ============================================
+
+export interface ApiError {
+    error: string;
 }
 
-// Pagination
-export interface PaginatedResponse<T> {
-    items: T[];
-    total: number;
-    page: number;
-    pageSize: number;
-    totalPages: number;
+export interface StreamStatus {
+    church_id: number;
+    church_name: string;
+    streaming_active: boolean;
+    stream_id?: string;
+    stream_key?: string;
+    session?: {
+        id: number;
+        started_at: string;
+    };
+}
+
+export interface StreamActionResponse {
+    message: string;
+    session: StreamingSession;
+}
+
+export interface ChurchListResponse {
+    churches: Church[];
+}
+
+export interface SessionListResponse {
+    sessions: StreamingSession[];
+}
+
+export interface SubscriptionEntry {
+    subscription_id: number;
+    church_id: number;
+    church_name: string;
+    church_logo_url?: string;
+    streaming_active: boolean;
+    notifications_enabled: boolean;
+    subscribed_at: string;
+}
+
+export interface SubscriptionListResponse {
+    subscriptions: SubscriptionEntry[];
+}
+
+export interface StreamURLResponse {
+    church_id: number;
+    church_name: string;
+    streaming_active: boolean;
+    stream_url: string;
+}
+
+// ============================================
+// ST1 LOCAL (smixRest on port 8080)
+// ============================================
+
+export interface ST1Status {
+    state: 'streaming' | 'stopped' | 'noid';
+    current_time: number;
+}
+
+export interface ST1Setup {
+    stream_url: string;
 }

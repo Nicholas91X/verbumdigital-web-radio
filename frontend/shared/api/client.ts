@@ -1,65 +1,151 @@
-/**
- * API Client - Fetch wrapper per le chiamate al backend
- */
+import type { ApiError } from './types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+// ============================================
+// CONFIGURATION
+// ============================================
 
-interface RequestOptions extends RequestInit {
-    params?: Record<string, string>;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081/api/v1';
+const ST1_BASE_URL = import.meta.env.VITE_ST1_BASE_URL || 'http://localhost:8080';
+
+// ============================================
+// TOKEN MANAGEMENT
+// ============================================
+
+const TOKEN_KEY = 'auth_token';
+const USER_KEY = 'auth_user';
+
+export function getToken(): string | null {
+    return localStorage.getItem(TOKEN_KEY);
 }
 
-/**
- * Fetch wrapper con gestione automatica di headers e errori
- */
-export async function apiClient<T>(
-    endpoint: string,
-    options: RequestOptions = {}
-): Promise<T> {
-    const { params, ...fetchOptions } = options;
+export function setAuth(token: string, user: object): void {
+    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
 
-    // Build URL with query params
-    const url = new URL(`${API_BASE_URL}${endpoint}`);
-    if (params) {
-        Object.entries(params).forEach(([key, value]) => {
-            url.searchParams.append(key, value);
+export function getUser<T = object>(): T | null {
+    const raw = localStorage.getItem(USER_KEY);
+    if (!raw) return null;
+    try {
+        return JSON.parse(raw) as T;
+    } catch {
+        return null;
+    }
+}
+
+export function clearAuth(): void {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+}
+
+export function isAuthenticated(): boolean {
+    return !!getToken();
+}
+
+// ============================================
+// API CLIENT (Backend on Hetzner)
+// ============================================
+
+class ApiClient {
+    private baseURL: string;
+
+    constructor(baseURL: string) {
+        this.baseURL = baseURL;
+    }
+
+    private async request<T>(
+        method: string,
+        path: string,
+        body?: object,
+        requireAuth = true
+    ): Promise<T> {
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+        };
+
+        if (requireAuth) {
+            const token = getToken();
+            if (!token) {
+                throw new Error('Not authenticated');
+            }
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(`${this.baseURL}${path}`, {
+            method,
+            headers,
+            body: body ? JSON.stringify(body) : undefined,
         });
+
+        // Handle 401 — auto logout
+        if (response.status === 401) {
+            clearAuth();
+            window.location.href = '/login';
+            throw new Error('Session expired');
+        }
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            const error = data as ApiError;
+            throw new Error(error.error || `Request failed: ${response.status}`);
+        }
+
+        return data as T;
     }
 
-    // Add default headers
-    const headers = new Headers(fetchOptions.headers);
-    if (!headers.has('Content-Type')) {
-        headers.set('Content-Type', 'application/json');
+    // Public (no auth)
+    get<T>(path: string, requireAuth = true): Promise<T> {
+        return this.request<T>('GET', path, undefined, requireAuth);
     }
 
-    // Add auth token if available
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-        headers.set('Authorization', `Bearer ${token}`);
+    post<T>(path: string, body?: object, requireAuth = true): Promise<T> {
+        return this.request<T>('POST', path, body, requireAuth);
     }
 
-    const response = await fetch(url.toString(), {
-        ...fetchOptions,
-        headers,
-    });
-
-    if (!response.ok) {
-        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    put<T>(path: string, body?: object, requireAuth = true): Promise<T> {
+        return this.request<T>('PUT', path, body, requireAuth);
     }
 
-    return response.json();
+    delete<T>(path: string, requireAuth = true): Promise<T> {
+        return this.request<T>('DELETE', path, undefined, requireAuth);
+    }
 }
 
-// Convenience methods
-export const api = {
-    get: <T>(endpoint: string, params?: Record<string, string>) =>
-        apiClient<T>(endpoint, { method: 'GET', params }),
+export const api = new ApiClient(API_BASE_URL);
 
-    post: <T>(endpoint: string, data: unknown) =>
-        apiClient<T>(endpoint, { method: 'POST', body: JSON.stringify(data) }),
+// ============================================
+// ST1 CLIENT (Local device on LAN)
+// ============================================
 
-    put: <T>(endpoint: string, data: unknown) =>
-        apiClient<T>(endpoint, { method: 'PUT', body: JSON.stringify(data) }),
+class ST1Client {
+    private baseURL: string;
 
-    delete: <T>(endpoint: string) =>
-        apiClient<T>(endpoint, { method: 'DELETE' }),
-};
+    constructor(baseURL: string) {
+        this.baseURL = baseURL;
+    }
+
+    private async request<T>(method: string, path: string, body?: object): Promise<T> {
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+        };
+
+        const response = await fetch(`${this.baseURL}${path}`, {
+            method,
+            headers,
+            body: body ? JSON.stringify(body) : undefined,
+        });
+
+        return (await response.json()) as T;
+    }
+
+    get<T>(path: string): Promise<T> {
+        return this.request<T>('GET', path);
+    }
+
+    post<T>(path: string, body?: object): Promise<T> {
+        return this.request<T>('POST', path, body);
+    }
+}
+
+export const st1 = new ST1Client(ST1_BASE_URL);
