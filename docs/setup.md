@@ -1,152 +1,118 @@
-# Guida Setup Sviluppo
+# Setup Locale — Guida Dettagliata
 
 ## Prerequisiti
 
-- **Go** 1.22+
-- **Node.js** 18+ e npm
-- **PostgreSQL** 15+ (locale per dev, oppure tunnel SSH a Hetzner)
-- **Git**
+| Tool | Versione | Verifica |
+|:--|:--|:--|
+| Go | 1.23+ | `go version` |
+| Node.js | 22+ | `node --version` |
+| Docker Desktop | 28+ | `docker --version` |
 
-## 1. Clone e struttura
+## 1. Database (Docker Compose)
+
+Il file `docker-compose.yml` nella root del progetto avvia un container PostgreSQL 16 e applica automaticamente la migrazione `001_initial_schema.sql` al primo avvio.
 
 ```bash
-git clone <repo-url>
-cd verbumdigital-web-radio
+# Avvia il database
+docker compose up -d
+
+# Verifica che sia in esecuzione
+docker compose ps
+
+# Verifica le tabelle
+docker exec vd-postgres psql -U st1stream -d st1stream -c "\dt"
 ```
 
-## 2. Backend
+### Reset completo del database
 
 ```bash
+docker compose down -v   # Elimina anche il volume dati
+docker compose up -d     # Ricrea tutto da zero
+```
+
+### Connessione diretta
+
+```
+Host:     localhost
+Port:     5432 (o come definito in .env → DB_PORT)
+User:     st1stream
+Password: (vedi .env)
+Database: st1stream
+```
+
+## 2. Configurazione Backend
+
+```bash
+# Copia il template
+cp .env.example backend/.env
+
+# Modifica con le tue credenziali
+# Importante: DB_PORT deve corrispondere a docker-compose.yml
+```
+
+| Variabile | Descrizione | Default |
+|:--|:--|:--|
+| `PORT` | Porta del backend | `8081` |
+| `DB_HOST` | Host PostgreSQL | `localhost` |
+| `DB_PORT` | Porta PostgreSQL | `5432` |
+| `DB_USER` | Utente database | `st1stream` |
+| `DB_PASSWORD` | Password database | — |
+| `DB_NAME` | Nome database | `st1stream` |
+| `DB_SSLMODE` | SSL mode | `disable` |
+| `JWT_SECRET` | Chiave JWT (min 32 char) | — |
+| `JWT_EXPIRATION_HOURS` | Durata token | `720` |
+| `ICECAST_BASE_URL` | Server Icecast | `http://vdserv.com:8000` |
+| `DEVICE_API_KEY` | Chiave autenticazione ST1 | — |
+
+## 3. Seed Admin
+
+Al primo avvio bisogna creare un utente admin:
+
+```bash
+# Genera hash bcrypt
 cd backend
+go run ../tools/gen-hash.go <tua-password>
 
-# Copia e configura environment
-cp .env.example .env
-# Modifica .env con le tue credenziali DB
-
-# Scarica dipendenze
-go mod tidy
-
-# Esegui migrazione DB
-psql -h localhost -U st1stream -d st1stream -f migrations/001_initial_schema.sql
-
-# Avvia server
-go run cmd/server/main.go
+# Modifica tools/seed-admin.sql con l'hash generato
+# Poi esegui:
+docker exec -i vd-postgres psql -U st1stream -d st1stream < ../tools/seed-admin.sql
 ```
 
-Il server parte su `http://localhost:8081`.
-
-### Verifica
+## 4. Avvio Servizi
 
 ```bash
-# Health check
-curl http://localhost:8081/health
+# Backend Go (terminale 1)
+cd backend && go run ./cmd/server
 
-# Dovrebbe rispondere:
-# {"status":"ok"}
+# Mock ST1 — opzionale (terminale 2)
+node tools/mock-st1.js
+
+# Admin PWA (terminale 3)
+cd frontend/admin && npm i && npm run dev
+
+# Priest PWA (terminale 4)
+cd frontend/priest && npm i && npm run dev
+
+# User PWA (terminale 5)
+cd frontend/user && npm i && npm run dev
 ```
 
-### Creare il primo admin
+## 5. Variabili Frontend
 
-```bash
-# Genera un bcrypt hash per la password
-# Puoi usare: https://bcrypt-generator.com/ oppure un tool Go
+Le PWA usano variabili Vite nel file `.env` nella rispettiva cartella:
 
-# Inserisci nel DB
-psql -h localhost -U st1stream -d st1stream -c "
-INSERT INTO admins (username, email, password_hash)
-VALUES ('admin', 'admin@verbumdigital.com', '\$2a\$10\$YOUR_HASH_HERE');
-"
-```
+| Variabile | Descrizione | Default |
+|:--|:--|:--|
+| `VITE_API_BASE_URL` | URL del backend | `http://localhost:8081/api/v1` |
+| `VITE_ST1_BASE_URL` | URL del Mock ST1 (solo Priest) | `http://localhost:8080` |
 
-### Test login admin
+## 6. Test del flusso completo
 
-```bash
-curl -X POST http://localhost:8081/api/v1/auth/admin/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@verbumdigital.com","password":"your_password"}'
-```
-
-## 3. Frontend
-
-```bash
-cd frontend
-
-# Per ogni PWA (admin, priest, user):
-cd priest
-npm install
-npm run dev
-```
-
-## 4. Test del flusso completo
-
-### Prerequisiti
-1. Backend in esecuzione su :8081
-2. Admin creato nel DB
-3. Almeno una macchina, chiesa e prete creati via API admin
-
-### Flusso di test
-
-```bash
-# 1. Login admin
-TOKEN=$(curl -s -X POST http://localhost:8081/api/v1/auth/admin/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@verbumdigital.com","password":"secret"}' | jq -r '.token')
-
-# 2. Crea macchina
-curl -X POST http://localhost:8081/api/v1/admin/machines \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"machine_id":"SMIX-TEST-001"}'
-
-# 3. Attiva macchina
-curl -X PUT http://localhost:8081/api/v1/admin/machines/1/activate \
-  -H "Authorization: Bearer $TOKEN"
-
-# 4. Crea chiesa (auto-genera streaming credentials)
-curl -X POST http://localhost:8081/api/v1/admin/churches \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Parrocchia Test","address":"Via Test 1","machine_id":1}'
-
-# 5. Crea prete e assegna alla chiesa
-curl -X POST http://localhost:8081/api/v1/admin/priests \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Don Test","email":"don.test@email.com","password":"secret123","church_ids":[1]}'
-
-# 6. Login come prete
-PRIEST_TOKEN=$(curl -s -X POST http://localhost:8081/api/v1/auth/priest/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"don.test@email.com","password":"secret123"}' | jq -r '.token')
-
-# 7. Verifica chiese del prete
-curl http://localhost:8081/api/v1/priest/churches \
-  -H "Authorization: Bearer $PRIEST_TOKEN"
-
-# 8. Avvia stream
-curl -X POST http://localhost:8081/api/v1/priest/churches/1/stream/start \
-  -H "Authorization: Bearer $PRIEST_TOKEN"
-
-# 9. Ferma stream
-curl -X POST http://localhost:8081/api/v1/priest/churches/1/stream/stop \
-  -H "Authorization: Bearer $PRIEST_TOKEN"
-```
-
-## 5. Connessione al DB Hetzner (remoto)
-
-```bash
-# Via SSH tunnel
-ssh -L 5432:localhost:5432 user@vdserv.com
-
-# Poi connettiti come se fosse localhost
-psql -h localhost -U st1stream -d st1stream
-```
-
-## Struttura porte
-
-| Servizio | Porta | Note |
-|----------|-------|------|
-| Backend API | 8081 | Go/Gin |
-| smixRest (ST1) | 8080 | Solo rete locale |
-| Icecast | 8000 | vdserv.com |
-| PostgreSQL | 5432 | Hetzner |
+1. Apri Admin PWA → Login con le credenziali admin
+2. Crea una macchina → Attivala
+3. Crea una chiesa → Associa la macchina
+4. Crea un sacerdote → Associa alla chiesa
+5. Apri Priest PWA → Login con il sacerdote creato
+6. Clicca "Avvia Stream" → Verifica Mock ST1 in console
+7. Apri User PWA → Registra un utente → Iscriviti alla chiesa
+8. Verifica che lo stream risulti "Live"
