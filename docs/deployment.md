@@ -1,190 +1,196 @@
-# Guida Deployment
+# Guida al Deployment su Hetzner
 
-## Infrastruttura
+Questa guida illustra i passaggi per portare l'applicazione VerbumDigital in produzione su un server Linux (Ubuntu/Debian) di Hetzner.
 
-Tutto su **Hetzner** (stesso server di Icecast e PostgreSQL):
-- OS: Linux (Ubuntu)
-- Server: vdserv.com
-- PostgreSQL: porta 5432
-- Icecast: porta 8000
-- Backend API: porta 8081
+## 1. Prerequisiti
 
-## Backend (Go)
+*   **Server VPS**: Accesso SSH `root` al server.
+*   **Domini**: Domini puntati all'IP del server (es. `api.verbumdigital.com`, `admin.verbumdigital.com`, ecc.).
+*   **Docker & Docker Compose**: Installati sul server.
 
-### Build
-
+### Installazione Docker (se non presente)
 ```bash
-cd backend
-
-# Build binario per Linux
-GOOS=linux GOARCH=amd64 go build -o bin/webradio-api cmd/server/main.go
+apt update && apt upgrade -y
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+apt install -y docker-compose-plugin
 ```
 
-### Deploy
+## 2. Preparazione Database (PostgreSQL)
 
-```bash
-# Upload binario
-scp bin/webradio-api user@vdserv.com:/opt/webradio/
+Su Hetzner, useremo Docker per gestire il database in modo semplice e isolato, simile all'ambiente locale.
 
-# Upload .env di produzione
-scp .env.production user@vdserv.com:/opt/webradio/.env
-```
+1.  **Crea una directory per il progetto**:
+    ```bash
+    mkdir -p /opt/verbumdigital/database
+    cd /opt/verbumdigital/database
+    ```
 
-### Systemd service
+2.  **Crea `docker-compose.yml` per il DB**:
+    ```yaml
+    version: '3.8'
+    services:
+      postgres:
+        image: postgres:16-alpine
+        container_name: vd-postgres
+        restart: always
+        environment:
+          POSTGRES_USER: st1stream
+          POSTGRES_PASSWORD: <PASSWORD_SICURA_DB>
+          POSTGRES_DB: st1stream
+        ports:
+          - "5432:5432"
+        volumes:
+          - pgdata:/var/lib/postgresql/data
+    volumes:
+      pgdata:
+        driver: local
+    ```
 
-```ini
-# /etc/systemd/system/webradio-api.service
+3.  **Avvia il database**:
+    ```bash
+    docker compose up -d
+    ```
 
-[Unit]
-Description=VerbumDigital WebRadio API
-After=network.target postgresql.service
+4.  **Copia lo schema iniziale**:
+    Dalla tua macchina locale, copia il file SQL sul server:
+    ```bash
+    scp backend/migrations/001_initial_schema.sql root@<IP_HETZNER>:/opt/verbumdigital/database/
+    ```
 
-[Service]
-Type=simple
-User=webradio
-WorkingDirectory=/opt/webradio
-ExecStart=/opt/webradio/webradio-api
-EnvironmentFile=/opt/webradio/.env
-Restart=always
-RestartSec=5
+5.  **Esegui la migrazione**:
+    Sul server:
+    ```bash
+    docker exec -i vd-postgres psql -U st1stream -d st1stream < /opt/verbumdigital/database/001_initial_schema.sql
+    ```
 
-[Install]
-WantedBy=multi-user.target
-```
+## 3. Preparazione e Compilazione Backend (Go)
 
-```bash
-sudo systemctl enable webradio-api
-sudo systemctl start webradio-api
-sudo systemctl status webradio-api
+Dobbiamo compilare l'eseguibile Go per l'architettura Linux del server (generalmente `amd64`).
 
-# Logs
-sudo journalctl -u webradio-api -f
-```
+1.  **Compilazione Cross-Platform** (Locale):
+    Apri un terminale nella cartella `backend` del tuo progetto locale:
+    ```powershell
+    # Windows (PowerShell)
+    $Env:GOOS = "linux"
+    $Env:GOARCH = "amd64"
+    go build -o vd-server ./cmd/server
+    # (Dopo la compilazione, rimuovi le variabili d'ambiente se necessario o riavvia il terminale)
+    ```
 
-## Frontend (PWA)
+2.  **Upload dei file**:
+    Crea la cartella app sul server: `mkdir -p /opt/verbumdigital/backend`.
+    Copia l'eseguibile e crea il file `.env`.
+    ```bash
+    scp backend/vd-server root@<IP_HETZNER>:/opt/verbumdigital/backend/
+    ```
 
-### Build
+3.  **Configurazione `.env` Produzione**:
+    Sul server, crea `/opt/verbumdigital/backend/.env`:
+    ```bash
+    nano /opt/verbumdigital/backend/.env
+    ```
+    Incolla e personalizza:
+    ```ini
+    PORT=8080
+    DB_HOST=localhost
+    DB_PORT=5432
+    DB_USER=st1stream
+    DB_PASSWORD=<PASSWORD_SICURA_DB_SCELTA_PRIMA>
+    DB_NAME=st1stream
+    DB_SSLMODE=disable
+    
+    JWT_SECRET=<GENERA_UNA_STRINGA_LUNGA_E_CASUALE>
+    JWT_EXPIRATION_HOURS=720
+    
+    # URL Server Icecast (di produzione)
+    ICECAST_BASE_URL=http://<IP_O_DOMINIO_ICECAST>:8000
+    
+    DEVICE_API_KEY=<GENERA_UNA_CHIAVE_PER_ST1>
+    ```
 
-```bash
-cd frontend/admin && npm run build
-cd frontend/priest && npm run build
-cd frontend/user && npm run build
-```
+## 4. Configurazione Systemd (Service)
 
-Ogni build produce una cartella `dist/` con file statici.
+Per far girare il backend come servizio background che si riavvia automaticamente.
 
-### Deploy con Nginx
+1.  **Crea il file di servizio**:
+    ```bash
+    nano /etc/systemd/system/verbumdigital.service
+    ```
 
-```nginx
-# /etc/nginx/sites-available/webradio
+2.  **Contenuto**:
+    ```ini
+    [Unit]
+    Description=VerbumDigital Backend API
+    After=network.target docker.service
 
-# Admin PWA
-server {
-    listen 443 ssl;
-    server_name admin.verbumdigital.com;
+    [Service]
+    User=root
+    WorkingDirectory=/opt/verbumdigital/backend
+    ExecStart=/opt/verbumdigital/backend/vd-server
+    Restart=always
+    RestartSec=5
+    EnvironmentFile=/opt/verbumdigital/backend/.env
+    LimitNOFILE=10000
 
-    root /var/www/webradio/admin;
-    index index.html;
+    [Install]
+    WantedBy=multi-user.target
+    ```
 
-    # PWA: tutte le route servono index.html
-    location / {
-        try_files $uri $uri/ /index.html;
+3.  **Attivazione**:
+    ```bash
+    systemctl daemon-reload
+    systemctl enable verbumdigital
+    systemctl start verbumdigital
+    systemctl status verbumdigital
+    ```
+
+## 5. Reverse Proxy & HTTPS (Caddy)
+
+Caddy è consigliato per gestire automaticamente i certificati SSL.
+
+1.  **Installazione Caddy**:
+    (Segui le istruzioni ufficiali per la tua distro, su Ubuntu:)
+    ```bash
+    sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+    sudo apt update
+    sudo apt install caddy
+    ```
+
+2.  **Configurazione `/etc/caddy/Caddyfile`**:
+    ```caddyfile
+    api.verbumdigital.com {
+        reverse_proxy localhost:8080
     }
+    
+    # Se ospiti anche i frontend qui:
+    # app.verbumdigital.com {
+    #     root * /var/www/user_pwa
+    #     file_server
+    # }
+    ```
 
-    # SSL (Let's Encrypt)
-    ssl_certificate /etc/letsencrypt/live/admin.verbumdigital.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/admin.verbumdigital.com/privkey.pem;
-}
+3.  **Riavvia Caddy**:
+    ```bash
+    systemctl restart caddy
+    ```
 
-# Priest PWA
-server {
-    listen 443 ssl;
-    server_name priest.verbumdigital.com;
+## 6. Hosting Frontend (PWAs)
 
-    root /var/www/webradio/priest;
-    index index.html;
+Per le PWA (React/Vite), devi fare la build locale e caricare i file statici (`dist`).
 
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
+1.  **Build Locale**:
+    Nelle cartelle `frontend/admin`, `frontend/priest`, `frontend/user`:
+    Assicurati che `.env.production` abbia:
+    ```
+    VITE_API_BASE_URL=https://api.verbumdigital.com/api/v1
+    ```
+    Poi esegui:
+    ```bash
+    npm run build
+    ```
 
-    ssl_certificate /etc/letsencrypt/live/priest.verbumdigital.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/priest.verbumdigital.com/privkey.pem;
-}
-
-# User PWA (ogni chiesa potrebbe avere un sottodominio — TBD)
-server {
-    listen 443 ssl;
-    server_name app.verbumdigital.com;
-
-    root /var/www/webradio/user;
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    ssl_certificate /etc/letsencrypt/live/app.verbumdigital.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/app.verbumdigital.com/privkey.pem;
-}
-
-# API Proxy
-server {
-    listen 443 ssl;
-    server_name api.verbumdigital.com;
-
-    location / {
-        proxy_pass http://127.0.0.1:8081;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    ssl_certificate /etc/letsencrypt/live/api.verbumdigital.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/api.verbumdigital.com/privkey.pem;
-}
-```
-
-### Upload
-
-```bash
-# Upload build artifacts
-scp -r frontend/admin/dist/* user@vdserv.com:/var/www/webradio/admin/
-scp -r frontend/priest/dist/* user@vdserv.com:/var/www/webradio/priest/
-scp -r frontend/user/dist/* user@vdserv.com:/var/www/webradio/user/
-```
-
-## SSL (Let's Encrypt)
-
-```bash
-sudo apt install certbot python3-certbot-nginx
-
-sudo certbot --nginx -d admin.verbumdigital.com
-sudo certbot --nginx -d priest.verbumdigital.com
-sudo certbot --nginx -d app.verbumdigital.com
-sudo certbot --nginx -d api.verbumdigital.com
-```
-
-## Database migration (produzione)
-
-```bash
-# Da locale via SSH tunnel
-ssh -L 5432:localhost:5432 user@vdserv.com
-
-psql -h localhost -U st1stream -d st1stream -f backend/migrations/001_initial_schema.sql
-```
-
-## Checklist pre-deploy
-
-- [ ] .env di produzione con password sicure
-- [ ] JWT_SECRET generato (almeno 32 chars random)
-- [ ] DEVICE_API_KEY generato e comunicato a Svilen
-- [ ] DB migrato
-- [ ] Admin account seed inserito
-- [ ] SSL certificati attivi
-- [ ] Firewall: porte 443, 8000 (Icecast) aperte
-- [ ] Firewall: porta 5432 (PostgreSQL) chiusa dall'esterno
-- [ ] Nginx configurato e testato
-- [ ] Systemd service attivo
-- [ ] Backup DB configurato
+2.  **Upload**:
+    Carica il contenuto delle cartelle `dist` sul server in `/var/www/` (es. `/var/www/admin`, `/var/www/user`, ecc.) e configura Caddy per servirle.
