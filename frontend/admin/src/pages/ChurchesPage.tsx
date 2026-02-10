@@ -1,157 +1,347 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, type FormEvent } from 'react';
 import { api } from '@shared/api/client';
-import type { Church, Machine } from '@shared/api/types';
-import { Plus, Edit2, Key as KeyIcon, Check, MapPin } from 'lucide-react';
+import type { Church, Machine, StreamingCredential } from '@shared/api/types';
+import Modal from '@/components/Modal';
 
 export default function ChurchesPage() {
     const [churches, setChurches] = useState<Church[]>([]);
     const [machines, setMachines] = useState<Machine[]>([]);
-    const [showModal, setShowModal] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [showCreate, setShowCreate] = useState(false);
+    const [editChurch, setEditChurch] = useState<Church | null>(null);
 
-    const [formData, setFormData] = useState({ name: '', address: '', logo_url: '', machine_id: '' });
-
-    const fetchAll = async () => {
+    const fetchData = useCallback(async () => {
         try {
-            const [ch, mc] = await Promise.all([
+            const [cRes, mRes] = await Promise.all([
                 api.get<{ churches: Church[] }>('/admin/churches'),
-                api.get<{ machines: Machine[] }>('/admin/machines')
+                api.get<{ machines: Machine[] }>('/admin/machines'),
             ]);
-            setChurches(ch.churches || []);
-            setMachines(mc.machines?.filter(m => m.activated) || []);
-        } catch (err) { } finally { setLoading(false); }
-    };
+            setChurches(cRes.churches || []);
+            setMachines(mRes.machines || []);
+        } catch {
+            //
+        } finally {
+            setLoading(false);
+        }
+    }, []);
 
-    useEffect(() => { fetchAll(); }, []);
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        try {
-            // Convert machine_id to number or null
-            const payload = {
-                ...formData,
-                machine_id: formData.machine_id ? parseInt(formData.machine_id) : undefined
-            };
-            await api.post('/admin/churches', payload);
-            setShowModal(false);
-            setFormData({ name: '', address: '', logo_url: '', machine_id: '' });
-            fetchAll();
-        } catch (err) { alert(err); }
-    };
-
-    if (loading) return <div>In caricamento...</div>;
+    // Machines not yet assigned to a church
+    const availableMachines = machines.filter(
+        (m) => !churches.some((c) => c.machine_id === m.id) || m.id === editChurch?.machine_id
+    );
 
     return (
-        <div className="space-y-8">
+        <div className="p-6 space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-extrabold tracking-tight">Gestione Chiese</h1>
-                    <p className="text-surface-400 mt-1">Configura le parrocchie e le loro credenziali di streaming</p>
+                    <h1 className="text-2xl font-bold">Chiese</h1>
+                    <p className="text-surface-400 text-sm mt-0.5">Parrocchie registrate con credenziali streaming</p>
                 </div>
-                <button
-                    onClick={() => setShowModal(true)}
-                    className="btn-primary flex items-center gap-2"
-                >
-                    <Plus size={20} />
-                    Nuova Chiesa
+                <button onClick={() => setShowCreate(true)} className="btn-primary">
+                    + Nuova Chiesa
                 </button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {churches.map(church => (
-                    <div key={church.id} className="card group relative">
-                        <div className="flex gap-4">
-                            <div className="w-20 h-20 bg-surface-800 rounded-2xl overflow-hidden flex-shrink-0 border border-white/5">
-                                {church.logo_url && <img src={church.logo_url} className="w-full h-full object-cover" />}
-                            </div>
-                            <div className="flex-1 min-w-0 space-y-1">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="font-bold text-lg truncate">{church.name}</h3>
-                                    <button className="text-surface-600 hover:text-white transition-colors">
-                                        <Edit2 size={16} />
-                                    </button>
-                                </div>
-                                <div className="flex items-center gap-1.5 text-xs text-surface-400">
-                                    <MapPin size={12} />
-                                    <span className="truncate">{church.address}</span>
-                                </div>
-                                <div className="pt-2 flex flex-wrap gap-2">
-                                    {church.machine ? (
-                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-500/10 text-emerald-400 rounded-md text-[10px] font-bold border border-emerald-500/20">
-                                            <Check size={10} />
-                                            ST1: {church.machine.machine_id}
-                                        </span>
-                                    ) : (
-                                        <span className="inline-flex items-center px-2 py-0.5 bg-amber-500/10 text-amber-400 rounded-md text-[10px] font-bold border border-amber-500/20">
-                                            Hardware mancante
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Credentials Reveal (Simulated for admin) */}
-                        {church.streaming_credential && (
-                            <div className="mt-4 pt-4 border-t border-white/5 bg-white/5 -mx-5 -mb-5 p-5 rounded-b-2xl">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] font-bold text-surface-500 uppercase flex items-center gap-1">
-                                        <KeyIcon size={10} /> Streaming Credentials
-                                    </span>
-                                </div>
-                                <div className="space-y-2">
-                                    <CredentialRow label="ID Stream" value={church.streaming_credential.stream_id} />
-                                    <CredentialRow label="Mount Point" value={`/${church.streaming_credential.stream_id}.mp3`} />
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                ))}
-            </div>
+            {loading ? (
+                <Loading />
+            ) : churches.length === 0 ? (
+                <EmptyState message="Nessuna chiesa registrata" />
+            ) : (
+                <div className="card overflow-hidden p-0">
+                    <table className="w-full">
+                        <thead className="bg-surface-900/50">
+                            <tr>
+                                <th className="table-header">Nome</th>
+                                <th className="table-header">Macchina</th>
+                                <th className="table-header">Stream ID</th>
+                                <th className="table-header">Sacerdoti</th>
+                                <th className="table-header">Stato</th>
+                                <th className="table-header text-right">Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-surface-700">
+                            {churches.map((c) => (
+                                <tr key={c.id}>
+                                    <td className="table-cell">
+                                        <div className="font-medium">{c.name}</div>
+                                        {c.address && <div className="text-xs text-surface-500">{c.address}</div>}
+                                    </td>
+                                    <td className="table-cell font-mono text-surface-400 text-xs">
+                                        {c.machine?.machine_id || '—'}
+                                    </td>
+                                    <td className="table-cell font-mono text-xs text-surface-400">
+                                        {c.streaming_credential?.stream_id || '—'}
+                                    </td>
+                                    <td className="table-cell text-surface-400">
+                                        {c.priests && c.priests.length > 0
+                                            ? c.priests.map((p) => p.name).join(', ')
+                                            : '—'}
+                                    </td>
+                                    <td className="table-cell">
+                                        {c.streaming_active ? (
+                                            <span className="badge-live">
+                                                <span className="w-1.5 h-1.5 bg-red-400 rounded-full mr-1.5 animate-pulse" />
+                                                LIVE
+                                            </span>
+                                        ) : (
+                                            <span className="badge-offline">Offline</span>
+                                        )}
+                                    </td>
+                                    <td className="table-cell text-right">
+                                        <button
+                                            onClick={() => setEditChurch(c)}
+                                            className="text-xs font-medium text-primary-400 hover:text-primary-300 px-3 py-1"
+                                        >
+                                            Modifica
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
 
             {/* Create Modal */}
-            {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-surface-900 border border-white/10 w-full max-w-md rounded-3xl p-8 shadow-2xl animate-in zoom-in-95">
-                        <h2 className="text-2xl font-bold mb-6">Aggiungi Parrocchia</h2>
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div className="space-y-1.5">
-                                <label className="text-sm font-bold text-surface-400">Nome</label>
-                                <input className="input" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Es. San Giovanni" required />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-sm font-bold text-surface-400">Indirizzo</label>
-                                <input className="input" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} placeholder="Via Roma 1, Milano" />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-sm font-bold text-surface-400">Logo URL</label>
-                                <input className="input" value={formData.logo_url} onChange={e => setFormData({ ...formData, logo_url: e.target.value })} placeholder="https://..." />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-sm font-bold text-surface-400">Hardware ST1 (Opzionale)</label>
-                                <select className="input" value={formData.machine_id} onChange={e => setFormData({ ...formData, machine_id: e.target.value })}>
-                                    <option value="">Nessuno</option>
-                                    {machines.map(m => (
-                                        <option key={m.id} value={m.id}>{m.machine_id}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="flex gap-3 pt-6">
-                                <button type="button" onClick={() => setShowModal(false)} className="btn-ghost flex-1">Annulla</button>
-                                <button type="submit" className="btn-primary flex-1">Salva Chiesa</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+            <CreateChurchModal
+                open={showCreate}
+                onClose={() => setShowCreate(false)}
+                onCreated={() => { setShowCreate(false); fetchData(); }}
+                availableMachines={availableMachines}
+            />
+
+            {/* Edit Modal */}
+            {editChurch && (
+                <EditChurchModal
+                    open={true}
+                    church={editChurch}
+                    onClose={() => setEditChurch(null)}
+                    onSaved={() => { setEditChurch(null); fetchData(); }}
+                    availableMachines={availableMachines}
+                />
             )}
         </div>
     );
 }
 
-function CredentialRow({ label, value }: { label: string, value: string }) {
+// ============================================
+// Create Church Modal
+// ============================================
+
+function CreateChurchModal({
+    open, onClose, onCreated, availableMachines,
+}: {
+    open: boolean;
+    onClose: () => void;
+    onCreated: () => void;
+    availableMachines: Machine[];
+}) {
+    const [name, setName] = useState('');
+    const [address, setAddress] = useState('');
+    const [logoUrl, setLogoUrl] = useState('');
+    const [machineId, setMachineId] = useState('');
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [created, setCreated] = useState<{ church: Church; streaming_credentials: StreamingCredential } | null>(null);
+
+    const handleSubmit = async (e: FormEvent) => {
+        e.preventDefault();
+        setError('');
+        setLoading(true);
+        try {
+            const body: Record<string, unknown> = { name };
+            if (address) body.address = address;
+            if (logoUrl) body.logo_url = logoUrl;
+            if (machineId) body.machine_id = parseInt(machineId);
+
+            const data = await api.post<{ church: Church; streaming_credentials: StreamingCredential }>(
+                '/admin/churches',
+                body
+            );
+            setCreated(data);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Errore creazione');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleClose = () => {
+        setName(''); setAddress(''); setLogoUrl(''); setMachineId('');
+        setError(''); setCreated(null);
+        if (created) onCreated(); else onClose();
+    };
+
     return (
-        <div className="flex items-center justify-between text-xs">
-            <span className="text-surface-500">{label}</span>
-            <code className="bg-black/20 px-1.5 py-0.5 rounded font-mono text-primary-400">{value}</code>
+        <Modal open={open} onClose={handleClose} title={created ? 'Chiesa Creata' : 'Nuova Chiesa'}>
+            {created ? (
+                <div className="space-y-4">
+                    <p className="text-surface-300 text-sm">
+                        <span className="font-medium">{created.church.name}</span> creata con successo.
+                    </p>
+                    <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 space-y-2">
+                        <p className="text-xs text-surface-500 uppercase tracking-wider">Credenziali Streaming (auto-generate)</p>
+                        <p className="text-sm">
+                            <span className="text-surface-500">Stream ID:</span>{' '}
+                            <span className="font-mono font-medium text-emerald-400">{created.streaming_credentials.stream_id}</span>
+                        </p>
+                        <p className="text-sm">
+                            <span className="text-surface-500">Stream Key:</span>{' '}
+                            <span className="font-mono text-xs text-surface-300 break-all">{created.streaming_credentials.stream_key}</span>
+                        </p>
+                    </div>
+                    <p className="text-xs text-surface-500">
+                        Queste credenziali sono permanenti. L'URL Icecast sarà: <span className="font-mono">
+                            vdserv.com:8000/{created.streaming_credentials.stream_id}.mp3</span>
+                    </p>
+                    <button onClick={handleClose} className="btn-primary w-full">Chiudi</button>
+                </div>
+            ) : (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    {error && <ErrorBanner message={error} />}
+                    <div>
+                        <label className="block text-sm font-medium text-surface-300 mb-1.5">Nome *</label>
+                        <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="input" placeholder="Parrocchia San Pietro" required />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-surface-300 mb-1.5">Indirizzo</label>
+                        <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className="input" placeholder="Via Roma 1, Milano" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-surface-300 mb-1.5">Logo URL</label>
+                        <input type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} className="input" placeholder="https://..." />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-surface-300 mb-1.5">Macchina ST1</label>
+                        <select value={machineId} onChange={(e) => setMachineId(e.target.value)} className="input">
+                            <option value="">Nessuna (assegna dopo)</option>
+                            {availableMachines.map((m) => (
+                                <option key={m.id} value={m.id}>{m.machine_id}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="flex gap-3 justify-end">
+                        <button type="button" onClick={handleClose} className="btn-ghost">Annulla</button>
+                        <button type="submit" disabled={loading} className="btn-primary">{loading ? 'Creazione...' : 'Crea'}</button>
+                    </div>
+                </form>
+            )}
+        </Modal>
+    );
+}
+
+// ============================================
+// Edit Church Modal
+// ============================================
+
+function EditChurchModal({
+    open, church, onClose, onSaved, availableMachines,
+}: {
+    open: boolean;
+    church: Church;
+    onClose: () => void;
+    onSaved: () => void;
+    availableMachines: Machine[];
+}) {
+    const [name, setName] = useState(church.name);
+    const [address, setAddress] = useState(church.address || '');
+    const [logoUrl, setLogoUrl] = useState(church.logo_url || '');
+    const [machineId, setMachineId] = useState(church.machine_id?.toString() || '');
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const handleSubmit = async (e: FormEvent) => {
+        e.preventDefault();
+        setError('');
+        setLoading(true);
+        try {
+            const body: Record<string, unknown> = { name, address, logo_url: logoUrl };
+            if (machineId) body.machine_id = parseInt(machineId);
+
+            await api.put(`/admin/churches/${church.id}`, body);
+            onSaved();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Errore aggiornamento');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Modal open={open} onClose={onClose} title={`Modifica — ${church.name}`}>
+            <form onSubmit={handleSubmit} className="space-y-4">
+                {error && <ErrorBanner message={error} />}
+                <div>
+                    <label className="block text-sm font-medium text-surface-300 mb-1.5">Nome *</label>
+                    <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="input" required />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-surface-300 mb-1.5">Indirizzo</label>
+                    <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className="input" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-surface-300 mb-1.5">Logo URL</label>
+                    <input type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} className="input" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-surface-300 mb-1.5">Macchina ST1</label>
+                    <select value={machineId} onChange={(e) => setMachineId(e.target.value)} className="input">
+                        <option value="">Nessuna</option>
+                        {availableMachines.map((m) => (
+                            <option key={m.id} value={m.id}>{m.machine_id}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Stream credentials (read only) */}
+                {church.streaming_credential && (
+                    <div className="bg-surface-900/50 rounded-lg p-3 space-y-1">
+                        <p className="text-xs text-surface-500 uppercase tracking-wider">Credenziali Streaming</p>
+                        <p className="text-xs font-mono text-surface-400">
+                            Stream ID: {church.streaming_credential.stream_id}
+                        </p>
+                        <p className="text-xs font-mono text-surface-400 break-all">
+                            Stream Key: {church.streaming_credential.stream_key}
+                        </p>
+                    </div>
+                )}
+
+                <div className="flex gap-3 justify-end">
+                    <button type="button" onClick={onClose} className="btn-ghost">Annulla</button>
+                    <button type="submit" disabled={loading} className="btn-primary">{loading ? 'Salvataggio...' : 'Salva'}</button>
+                </div>
+            </form>
+        </Modal>
+    );
+}
+
+// ============================================
+// Shared
+// ============================================
+
+function ErrorBanner({ message }: { message: string }) {
+    return (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-red-400 text-sm">
+            {message}
         </div>
     );
+}
+
+function Loading() {
+    return (
+        <div className="flex justify-center py-12">
+            <svg className="animate-spin h-8 w-8 text-primary-500" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+        </div>
+    );
+}
+
+function EmptyState({ message }: { message: string }) {
+    return <div className="card text-surface-400 text-center py-12">{message}</div>;
 }

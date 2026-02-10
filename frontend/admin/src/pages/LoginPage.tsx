@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { Lock, User as UserIcon } from 'lucide-react';
 
 export default function LoginPage() {
     const { login } = useAuth();
@@ -20,73 +19,44 @@ export default function LoginPage() {
             await login({ email, password });
             navigate('/', { replace: true });
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Login failed');
+            setError(err instanceof Error ? err.message : 'Errore di login');
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center px-6 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary-950 via-surface-950 to-surface-950">
-            <div className="w-full max-w-md space-y-8 card p-10 bg-surface-900/40 border-white/5 shadow-2xl">
-                <div className="text-center space-y-3">
-                    <div className="w-16 h-16 bg-primary-600 rounded-2xl mx-auto flex items-center justify-center shadow-2xl shadow-primary-600/20 mb-6">
-                        <Lock className="text-white" size={28} />
+        <div className="min-h-screen flex items-center justify-center px-4">
+            <div className="w-full max-w-sm">
+                <div className="text-center mb-8">
+                    <div className="w-16 h-16 bg-primary-600 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                        <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
                     </div>
-                    <h1 className="text-2xl font-bold tracking-tight">Accesso Admin</h1>
-                    <p className="text-surface-500 text-sm">Pannello di controllo del sistema</p>
+                    <h1 className="text-2xl font-bold">VerbumDigital</h1>
+                    <p className="text-surface-400 mt-1">Pannello Admin</p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-4">
                     {error && (
-                        <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold py-3 px-4 rounded-xl text-center">
+                        <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-red-400 text-sm">
                             {error}
                         </div>
                     )}
-
-                    <div className="space-y-2">
-                        <div className="relative">
-                            <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-surface-600" size={18} />
-                            <input
-                                type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="input pl-12"
-                                placeholder="Admin Email"
-                                required
-                            />
-                        </div>
+                    <div>
+                        <label htmlFor="email" className="block text-sm font-medium text-surface-300 mb-1.5">Email</label>
+                        <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input" placeholder="admin@verbumdigital.com" required autoComplete="email" />
                     </div>
-
-                    <div className="space-y-2">
-                        <div className="relative">
-                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-surface-600" size={18} />
-                            <input
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="input pl-12"
-                                placeholder="Password"
-                                required
-                            />
-                        </div>
+                    <div>
+                        <label htmlFor="password" className="block text-sm font-medium text-surface-300 mb-1.5">Password</label>
+                        <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="input" placeholder="••••••••" required autoComplete="current-password" />
                     </div>
-
-                    <button
-                        disabled={loading}
-                        className="btn-primary w-full py-3.5 flex items-center justify-center gap-2 group"
-                    >
-                        {loading ? 'Accesso in corso...' : (
-                            <>
-                                Accedi al Pannello
-                            </>
-                        )}
+                    <button type="submit" disabled={loading} className="btn-primary w-full">
+                        {loading ? 'Accesso...' : 'Accedi'}
                     </button>
                 </form>
-
-                <div className="text-center">
-                    <p className="text-[10px] text-surface-600 uppercase font-bold tracking-[0.2em]">VerbumDigital Systems v1.0</p>
-                </div>
             </div>
         </div>
     );

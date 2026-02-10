@@ -4,7 +4,7 @@ import type { AuthResponse, LoginRequest } from '@shared/api/types';
 
 interface AuthUser {
     id: number;
-    username: string;
+    username?: string;
     email: string;
     role: string;
 }
@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const data = await api.post<AuthResponse>('/auth/admin/login', credentials, false);
         const authUser: AuthUser = {
             id: data.user.id,
-            username: data.user.username!,
+            username: data.user.username,
             email: data.user.email,
             role: data.user.role,
         };

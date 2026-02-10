@@ -1,95 +1,225 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, type FormEvent } from 'react';
 import { api } from '@shared/api/client';
 import type { Machine } from '@shared/api/types';
-import { Cpu, RefreshCw, CheckCircle, Terminal } from 'lucide-react';
+import Modal from '@/components/Modal';
 
 export default function MachinesPage() {
     const [machines, setMachines] = useState<Machine[]>([]);
     const [loading, setLoading] = useState(true);
+    const [showCreate, setShowCreate] = useState(false);
 
-    const fetchMachines = async () => {
+    const fetchMachines = useCallback(async () => {
         try {
             const data = await api.get<{ machines: Machine[] }>('/admin/machines');
             setMachines(data.machines || []);
-        } catch (err) { } finally { setLoading(false); }
-    };
+        } catch {
+            // handled by empty state
+        } finally {
+            setLoading(false);
+        }
+    }, []);
 
-    if (loading) return <div className="text-surface-400">Caricamento...</div>;
+    useEffect(() => {
+        fetchMachines();
+    }, [fetchMachines]);
 
-    useEffect(() => { fetchMachines(); }, []);
-
-    const generateCode = async () => {
+    const toggleActivation = async (machine: Machine) => {
+        const endpoint = machine.activated
+            ? `/admin/machines/${machine.id}/deactivate`
+            : `/admin/machines/${machine.id}/activate`;
         try {
-            await api.post('/admin/machines', {});
+            await api.put(endpoint);
             fetchMachines();
-        } catch (err) { alert(err); }
+        } catch {
+            // could show toast
+        }
     };
 
     return (
-        <div className="space-y-8">
+        <div className="p-6 space-y-6">
+            {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-extrabold tracking-tight">Dispositivi ST1</h1>
-                    <p className="text-surface-400 mt-1">Gestisci i codici di attivazione dell'hardware locale</p>
+                    <h1 className="text-2xl font-bold">Macchine</h1>
+                    <p className="text-surface-400 text-sm mt-0.5">Schede ST1 registrate nel sistema</p>
                 </div>
-                <button
-                    onClick={generateCode}
-                    className="btn-primary flex items-center gap-2"
-                >
-                    <PlusIcon />
-                    Genera Nuovo Codice
+                <button onClick={() => setShowCreate(true)} className="btn-primary">
+                    + Nuova Macchina
                 </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {machines.map(m => (
-                    <div key={m.id} className="card bg-surface-900 border-white/5 space-y-4">
-                        <div className="flex justify-between items-start">
-                            <div className="p-3 bg-white/5 rounded-xl">
-                                <Cpu size={24} className={m.activated ? 'text-emerald-400' : 'text-amber-400'} />
-                            </div>
-                            <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${m.activated ? 'bg-emerald-500/10 text-emerald-400' : 'bg-surface-800 text-surface-500'}`}>
-                                {m.activated ? 'Attivo' : 'In attesa'}
-                            </span>
-                        </div>
+            {/* Table */}
+            {loading ? (
+                <Loading />
+            ) : machines.length === 0 ? (
+                <EmptyState message="Nessuna macchina registrata" />
+            ) : (
+                <div className="card overflow-hidden p-0">
+                    <table className="w-full">
+                        <thead className="bg-surface-900/50">
+                            <tr>
+                                <th className="table-header">ID Macchina</th>
+                                <th className="table-header">Codice Attivazione</th>
+                                <th className="table-header">Chiesa</th>
+                                <th className="table-header">Stato</th>
+                                <th className="table-header text-right">Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-surface-700">
+                            {machines.map((m) => (
+                                <tr key={m.id}>
+                                    <td className="table-cell font-mono font-medium">{m.machine_id}</td>
+                                    <td className="table-cell font-mono text-surface-400">{m.activation_code || '—'}</td>
+                                    <td className="table-cell text-surface-400">{m.church?.name || '—'}</td>
+                                    <td className="table-cell">
+                                        {m.activated ? (
+                                            <span className="badge-success">Attiva</span>
+                                        ) : (
+                                            <span className="badge-warning">Inattiva</span>
+                                        )}
+                                    </td>
+                                    <td className="table-cell text-right">
+                                        <button
+                                            onClick={() => toggleActivation(m)}
+                                            className={`text-xs font-medium px-3 py-1 rounded-md transition-colors ${m.activated
+                                                    ? 'text-red-400 hover:bg-red-500/10'
+                                                    : 'text-emerald-400 hover:bg-emerald-500/10'
+                                                }`}
+                                        >
+                                            {m.activated ? 'Disattiva' : 'Attiva'}
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
 
-                        <div>
-                            <p className="text-[10px] font-bold text-surface-500 uppercase tracking-widest mb-1">Activation Code</p>
-                            <div className="flex items-center gap-2">
-                                <code className="text-2xl font-mono font-bold text-white tracking-widest">{m.machine_id}</code>
-                                <button className="p-2 text-surface-500 hover:text-white transition-colors">
-                                    <RefreshCw size={14} />
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="pt-4 border-t border-white/5 flex items-center justify-between">
-                            <div className="flex items-center gap-2 text-xs">
-                                {m.activated ? (
-                                    <>
-                                        <CheckCircle size={12} className="text-emerald-400" />
-                                        <span className="text-surface-400">Attivato {new Date(m.activated_at!).toLocaleDateString()}</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Terminal size={12} className="text-surface-600" />
-                                        <span className="text-surface-500 italic">Mai collegato</span>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
+            {/* Create Modal */}
+            <CreateMachineModal
+                open={showCreate}
+                onClose={() => setShowCreate(false)}
+                onCreated={() => {
+                    setShowCreate(false);
+                    fetchMachines();
+                }}
+            />
         </div>
     );
 }
 
-function PlusIcon() {
+// ============================================
+// Create Machine Modal
+// ============================================
+
+function CreateMachineModal({
+    open,
+    onClose,
+    onCreated,
+}: {
+    open: boolean;
+    onClose: () => void;
+    onCreated: () => void;
+}) {
+    const [machineId, setMachineId] = useState('');
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [created, setCreated] = useState<Machine | null>(null);
+
+    const handleSubmit = async (e: FormEvent) => {
+        e.preventDefault();
+        setError('');
+        setLoading(true);
+        try {
+            const data = await api.post<{ machine: Machine }>('/admin/machines', {
+                machine_id: machineId,
+            });
+            setCreated(data.machine);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Errore creazione');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleClose = () => {
+        setMachineId('');
+        setError('');
+        setCreated(null);
+        if (created) onCreated();
+        else onClose();
+    };
+
     return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-        </svg>
+        <Modal open={open} onClose={handleClose} title={created ? 'Macchina Creata' : 'Nuova Macchina'}>
+            {created ? (
+                <div className="space-y-4">
+                    <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 space-y-2">
+                        <p className="text-sm text-surface-300">
+                            <span className="text-surface-500">Machine ID:</span>{' '}
+                            <span className="font-mono font-medium">{created.machine_id}</span>
+                        </p>
+                        <p className="text-sm text-surface-300">
+                            <span className="text-surface-500">Codice Attivazione:</span>{' '}
+                            <span className="font-mono font-bold text-emerald-400">{created.activation_code}</span>
+                        </p>
+                    </div>
+                    <p className="text-xs text-surface-500">Comunica il codice di attivazione a Svilen per la configurazione del device.</p>
+                    <button onClick={handleClose} className="btn-primary w-full">
+                        Chiudi
+                    </button>
+                </div>
+            ) : (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    {error && (
+                        <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-red-400 text-sm">
+                            {error}
+                        </div>
+                    )}
+                    <div>
+                        <label className="block text-sm font-medium text-surface-300 mb-1.5">
+                            Machine ID
+                        </label>
+                        <input
+                            type="text"
+                            value={machineId}
+                            onChange={(e) => setMachineId(e.target.value)}
+                            className="input"
+                            placeholder="SMIX-12345"
+                            required
+                        />
+                        <p className="text-xs text-surface-500 mt-1">Identificativo univoco della scheda ST1</p>
+                    </div>
+                    <div className="flex gap-3 justify-end">
+                        <button type="button" onClick={handleClose} className="btn-ghost">
+                            Annulla
+                        </button>
+                        <button type="submit" disabled={loading} className="btn-primary">
+                            {loading ? 'Creazione...' : 'Crea'}
+                        </button>
+                    </div>
+                </form>
+            )}
+        </Modal>
     );
+}
+
+// ============================================
+// Shared helpers
+// ============================================
+
+function Loading() {
+    return (
+        <div className="flex justify-center py-12">
+            <svg className="animate-spin h-8 w-8 text-primary-500" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+        </div>
+    );
+}
+
+function EmptyState({ message }: { message: string }) {
+    return <div className="card text-surface-400 text-center py-12">{message}</div>;
 }
