@@ -142,7 +142,12 @@ function ChurchCard({ church, onStreamChange }: ChurchCardProps) {
             }
 
             // 3. Configure ST1 with stream URL
-            const streamUrl = `icecast://source:${status.stream_key}@vdserv.com:8000/${status.stream_id}.mp3`;
+            // PRODUCTION:
+            // const streamUrl = `icecast://source:${status.stream_key}@vdserv.com:8000/${status.stream_id}.mp3`;
+
+            // LOCAL TESTING (with docker-compose + mock-st1 --live):
+            const streamUrl = `icecast://source:${status.stream_key}@localhost:8000/${status.stream_id}.mp3`;
+
             await st1.post('/api/device/st1/setup', { stream_url: streamUrl });
 
             // 4. Start streaming on ST1

@@ -11,8 +11,12 @@
  */
 
 const http = require('http');
+const { spawn } = require('child_process');
 
 const PORT = 8085;
+const LIVE_MODE = process.argv.includes('--live');
+
+console.log(`[ST1] Initializing... Mode: ${LIVE_MODE ? 'LIVE (FFmpeg)' : 'SIMULATION'}`);
 
 // Device state
 let state = {
@@ -21,6 +25,7 @@ let state = {
     stream_url: '',
 };
 
+let ffmpegProcess = null;
 let timer = null;
 
 function parseBody(req) {
@@ -43,6 +48,65 @@ function json(res, data, status = 200) {
     });
     res.end(JSON.stringify(data));
 }
+
+const startFFmpeg = (url) => {
+    if (!LIVE_MODE) {
+        console.log('[ST1] FFmpeg not started (SIMULATION mode)');
+        return;
+    }
+    if (ffmpegProcess) return;
+
+    if (!url) {
+        console.error('[ST1] Cannot start FFmpeg: No URL configured');
+        return;
+    }
+
+    console.log(`[ST1] Starting FFmpeg to ${url}`);
+
+    // Generate sine wave (440Hz test tone)
+    const args = [
+        '-re',
+        '-f', 'lavfi',
+        '-i', 'sine=frequency=440:duration=3600',
+        '-c:a', 'libmp3lame',
+        '-b:a', '128k',
+        '-content_type', 'audio/mpeg',
+        '-f', 'mp3',
+        url
+    ];
+
+    try {
+        ffmpegProcess = spawn('ffmpeg', args);
+
+        ffmpegProcess.stderr.on('data', (data) => {
+            // Uncomment to debug ffmpeg
+            // console.log(`[FFmpeg] ${data}`);
+        });
+
+        ffmpegProcess.on('error', (err) => {
+            console.error('[ST1] FFmpeg failed to start:', err);
+        });
+
+        ffmpegProcess.on('close', (code) => {
+            console.log(`[ST1] FFmpeg exited with code ${code}`);
+            ffmpegProcess = null;
+        });
+    } catch (e) {
+        console.error('[ST1] Error spawning ffmpeg:', e);
+    }
+};
+
+const stopFFmpeg = () => {
+    if (!LIVE_MODE) {
+        console.log('[ST1] FFmpeg not stopped (SIMULATION mode)');
+        return;
+    }
+    if (ffmpegProcess) {
+        console.log('[ST1] Stopping FFmpeg...');
+        ffmpegProcess.kill('SIGINT');
+        ffmpegProcess = null;
+    }
+};
 
 const server = http.createServer(async (req, res) => {
     // Handle CORS preflight
@@ -82,11 +146,17 @@ const server = http.createServer(async (req, res) => {
         if (!state.stream_url) {
             return json(res, { success: false, error: 'No stream URL configured' }, 400);
         }
+
         state.state = 'streaming';
         state.current_time = 0;
-        // Simulate elapsed time
+
         if (timer) clearInterval(timer);
         timer = setInterval(() => { state.current_time++; }, 1000);
+
+        if (LIVE_MODE) {
+            startFFmpeg(state.stream_url);
+        }
+
         console.log(`[ST1] ▶ Streaming started`);
         return json(res, { success: true });
     }
@@ -97,6 +167,11 @@ const server = http.createServer(async (req, res) => {
         state.state = 'stopped';
         state.current_time = 0;
         if (timer) { clearInterval(timer); timer = null; }
+
+        if (LIVE_MODE) {
+            stopFFmpeg();
+        }
+
         console.log(`[ST1] ■ Streaming stopped (${elapsed}s)`);
         return json(res, { success: true });
     }
@@ -105,8 +180,14 @@ const server = http.createServer(async (req, res) => {
     json(res, { error: 'Not found' }, 404);
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`\n  🔧 Mock ST1 (smixRest) running on http://localhost:${PORT}`);
+    if (LIVE_MODE) {
+        console.log(`  🔴 LIVE AUDIO MODE ARMED (FFmpeg)`);
+    } else {
+        console.log(`  🔵 SIMULATION MODE (No real audio)`);
+        console.log(`  (Run with --live to enable real audio streaming)`);
+    }
     console.log(`  Endpoints:`);
     console.log(`    GET  /api/device/st1/status`);
     console.log(`    GET  /api/device/st1/setup`);
