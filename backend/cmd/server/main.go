@@ -139,6 +139,7 @@ func main() {
 			user.GET("/churches/:id", userHandler.GetChurch)
 			user.POST("/churches/:id/subscribe", userHandler.Subscribe)
 			user.DELETE("/churches/:id/subscribe", userHandler.Unsubscribe)
+			user.GET("/churches/:id/stream", userHandler.GetChurchStream)
 			user.PUT("/churches/:id/notifications", userHandler.UpdateNotifications)
 			user.GET("/subscriptions", userHandler.GetSubscriptions)
 			user.GET("/stream/:stream_id", userHandler.GetStreamURL)

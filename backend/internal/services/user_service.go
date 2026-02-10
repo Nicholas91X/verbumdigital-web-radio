@@ -189,3 +189,35 @@ func (s *UserService) GetStreamURL(userID int, streamID string) (map[string]inte
 		"stream_url":       streamURL,
 	}, nil
 }
+
+// GetChurchStream returns the stream info for a specific church
+func (s *UserService) GetChurchStream(userID, churchID int) (map[string]interface{}, error) {
+	var church models.Church
+	if err := s.DB.Preload("StreamingCredential").First(&church, churchID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("church not found")
+		}
+		return nil, err
+	}
+
+	// Check subscription
+	var subCount int64
+	s.DB.Model(&models.UserSubscription{}).
+		Where("user_id = ? AND church_id = ?", userID, churchID).
+		Count(&subCount)
+	if subCount == 0 {
+		return nil, errors.New("not subscribed to this church")
+	}
+
+	streamURL := ""
+	if church.StreamingCredential != nil {
+		streamURL = fmt.Sprintf("%s/%s.mp3", s.IcecastBaseURL, church.StreamingCredential.StreamID)
+	}
+
+	return map[string]interface{}{
+		"church_id":        church.ID,
+		"church_name":      church.Name,
+		"streaming_active": church.StreamingActive,
+		"stream_url":       streamURL,
+	}, nil
+}

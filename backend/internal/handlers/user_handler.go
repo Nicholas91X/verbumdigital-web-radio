@@ -184,3 +184,32 @@ func (h *UserHandler) GetStreamURL(c *gin.Context) {
 
 	c.JSON(http.StatusOK, stream)
 }
+
+// ============================================
+// GET /churches/:id/stream
+// ============================================
+
+func (h *UserHandler) GetChurchStream(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	churchID, err := parseIntParam(c, "id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid church ID"})
+		return
+	}
+
+	stream, err := h.UserService.GetChurchStream(userID, churchID)
+	if err != nil {
+		if err.Error() == "church not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		if err.Error() == "not subscribed to this church" {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get stream info"})
+		return
+	}
+
+	c.JSON(http.StatusOK, stream)
+}

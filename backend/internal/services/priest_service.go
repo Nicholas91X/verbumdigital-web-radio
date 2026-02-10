@@ -16,31 +16,50 @@ func NewPriestService(db *gorm.DB) *PriestService {
 	return &PriestService{DB: db}
 }
 
-// GetChurches returns all churches managed by the priest
 func (s *PriestService) GetChurches(priestID int) ([]models.Church, error) {
 	var priest models.Priest
-	if err := s.DB.Preload("Churches").First(&priest, priestID).Error; err != nil {
+	if err := s.DB.
+		Preload("Churches").
+		Preload("Churches.Machine").
+		Preload("Churches.StreamingCredential").
+		First(&priest, priestID).Error; err != nil {
 		return nil, err
 	}
 	return priest.Churches, nil
 }
 
-// GetStreamStatus returns current streaming status and credentials
 func (s *PriestService) GetStreamStatus(priestID, churchID int) (map[string]interface{}, error) {
 	if !s.isPriestOfChurch(priestID, churchID) {
 		return nil, errors.New("church not found or access denied")
 	}
 
 	var church models.Church
-	if err := s.DB.Preload("StreamingCredential").First(&church, churchID).Error; err != nil {
+	if err := s.DB.
+		Preload("StreamingCredential").
+		Preload("CurrentSession").
+		First(&church, churchID).Error; err != nil {
 		return nil, err
 	}
 
-	return map[string]interface{}{
-		"streaming_active": church.StreamingActive,
+	res := map[string]interface{}{
 		"church_id":        church.ID,
-		"credentials":      church.StreamingCredential,
-	}, nil
+		"church_name":      church.Name,
+		"streaming_active": church.StreamingActive,
+	}
+
+	if church.StreamingCredential != nil {
+		res["stream_id"] = church.StreamingCredential.StreamID
+		res["stream_key"] = church.StreamingCredential.StreamKey
+	}
+
+	if church.CurrentSession != nil {
+		res["session"] = map[string]interface{}{
+			"id":         church.CurrentSession.ID,
+			"started_at": church.CurrentSession.StartedAt,
+		}
+	}
+
+	return res, nil
 }
 
 // StartStream initializes a new streaming session
