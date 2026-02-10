@@ -1,11 +1,13 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 
 export default function LoginPage() {
-    const { login } = useAuth();
+    const { login, register } = useAuth();
     const navigate = useNavigate();
 
+    const [isRegister, setIsRegister] = useState(false);
+    const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -15,73 +17,123 @@ export default function LoginPage() {
         e.preventDefault();
         setError('');
         setLoading(true);
+
         try {
-            await login({ email, password });
+            if (isRegister) {
+                await register({ name, email, password });
+            } else {
+                await login({ email, password });
+            }
             navigate('/', { replace: true });
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Errore di login');
+            setError(err instanceof Error ? err.message : 'Errore');
         } finally {
             setLoading(false);
         }
     };
 
+    const toggleMode = () => {
+        setIsRegister(!isRegister);
+        setError('');
+    };
+
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center px-6 pt-12 pb-8">
-            <div className="w-full max-w-sm space-y-10">
-                <div className="text-center space-y-4">
-                    <div className="w-20 h-20 bg-primary-600 rounded-[2rem] mx-auto flex items-center justify-center shadow-xl shadow-primary-600/20 active:scale-95 transition-transform rotate-3">
-                        <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+        <div className="min-h-screen flex items-center justify-center px-4">
+            <div className="w-full max-w-sm">
+                {/* Header */}
+                <div className="text-center mb-8">
+                    <div className="w-16 h-16 bg-primary-600 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                        <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 010-7.072m-2.828 9.9a9 9 0 010-12.728" />
                         </svg>
                     </div>
-                    <div className="space-y-1">
-                        <h1 className="text-3xl font-extrabold tracking-tight">Bentornato</h1>
-                        <p className="text-surface-400 font-medium">Accedi per ascoltare la tua parrocchia</p>
-                    </div>
+                    <h1 className="text-2xl font-bold">VerbumDigital</h1>
+                    <p className="text-surface-400 mt-1">Radio Parrocchiale</p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-5">
+                {/* Form */}
+                <form onSubmit={handleSubmit} className="space-y-4">
                     {error && (
-                        <div className="bg-red-500/10 border border-red-500/30 rounded-2xl px-4 py-3 text-red-400 text-sm font-medium animate-in shake">
+                        <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-red-400 text-sm">
                             {error}
                         </div>
                     )}
 
-                    <div className="space-y-1.5">
-                        <label className="text-sm font-bold text-surface-200 ml-1">Email</label>
+                    {isRegister && (
+                        <div>
+                            <label htmlFor="name" className="block text-sm font-medium text-surface-300 mb-1.5">
+                                Nome
+                            </label>
+                            <input
+                                id="name"
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                className="input"
+                                placeholder="Il tuo nome"
+                                required
+                                autoComplete="name"
+                            />
+                        </div>
+                    )}
+
+                    <div>
+                        <label htmlFor="email" className="block text-sm font-medium text-surface-300 mb-1.5">
+                            Email
+                        </label>
                         <input
+                            id="email"
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             className="input"
-                            placeholder="tua@email.com"
+                            placeholder="nome@email.com"
                             required
+                            autoComplete="email"
                         />
                     </div>
 
-                    <div className="space-y-1.5">
-                        <label className="text-sm font-bold text-surface-200 ml-1">Password</label>
+                    <div>
+                        <label htmlFor="password" className="block text-sm font-medium text-surface-300 mb-1.5">
+                            Password
+                        </label>
                         <input
+                            id="password"
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             className="input"
                             placeholder="••••••••"
                             required
+                            autoComplete={isRegister ? 'new-password' : 'current-password'}
+                            minLength={isRegister ? 6 : undefined}
                         />
                     </div>
 
-                    <button disabled={loading} className="btn-primary w-full py-4 text-lg mt-2">
-                        {loading ? 'Accesso in corso...' : 'Accedi'}
+                    <button type="submit" disabled={loading} className="btn-primary w-full">
+                        {loading ? (
+                            <span className="inline-flex items-center gap-2">
+                                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                                {isRegister ? 'Registrazione...' : 'Accesso...'}
+                            </span>
+                        ) : (
+                            isRegister ? 'Registrati' : 'Accedi'
+                        )}
                     </button>
-
-                    <p className="text-center text-surface-400 text-sm pt-4">
-                        Non hai un account?{' '}
-                        <Link to="/register" className="text-primary-400 font-bold hover:underline underline-offset-4">
-                            Registrati ora
-                        </Link>
-                    </p>
                 </form>
+
+                {/* Toggle login/register */}
+                <div className="text-center mt-6">
+                    <button
+                        onClick={toggleMode}
+                        className="text-sm text-primary-400 hover:text-primary-300 transition-colors"
+                    >
+                        {isRegister ? 'Hai già un account? Accedi' : 'Non hai un account? Registrati'}
+                    </button>
+                </div>
             </div>
         </div>
     );

@@ -1,23 +1,20 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, Pause, Bell, BellOff, Volume2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '@shared/api/client';
-import type { SubscriptionEntry, StreamURLResponse } from '@shared/api/types';
+import type { SubscriptionEntry } from '@shared/api/types';
+import { useAuth } from '@/context/AuthContext';
 
 export default function HomePage() {
+    const { user } = useAuth();
     const [subscriptions, setSubscriptions] = useState<SubscriptionEntry[]>([]);
     const [loading, setLoading] = useState(true);
-    const [currentStream, setCurrentStream] = useState<StreamURLResponse | null>(null);
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [error, setError] = useState('');
-
-    const audioRef = useRef<HTMLAudioElement | null>(null);
 
     const fetchSubscriptions = useCallback(async () => {
         try {
             const data = await api.get<{ subscriptions: SubscriptionEntry[] }>('/user/subscriptions');
             setSubscriptions(data.subscriptions || []);
-        } catch (err) {
-            setError('Impossibile caricare le tue iscrizioni');
+        } catch {
+            //
         } finally {
             setLoading(false);
         }
@@ -25,161 +22,115 @@ export default function HomePage() {
 
     useEffect(() => {
         fetchSubscriptions();
+        // Poll every 30s for live status changes
+        const interval = setInterval(fetchSubscriptions, 30000);
+        return () => clearInterval(interval);
     }, [fetchSubscriptions]);
 
-    const handlePlay = async (churchId: number) => {
-        try {
-            // If already playing this stream, just toggle
-            if (currentStream && currentStream.church_id === churchId) {
-                if (isPlaying) {
-                    audioRef.current?.pause();
-                    setIsPlaying(false);
-                } else {
-                    await audioRef.current?.play();
-                    setIsPlaying(true);
-                }
-                return;
-            }
-
-            // Get new stream URL
-            setLoading(true);
-            const data = await api.get<StreamURLResponse>(`/user/stream/${churchId}`); // Note: ID in URL might be churchId or streamId depending on implementation
-            // Actually our endpoint is /user/stream/:stream_id, let's check backend/cmd/server/main.go
-            // Wait, looking at backend/internal/handlers/user_handler.go: GetStreamURL(c *gin.Context)
-            // It uses c.Param("stream_id") but then UserService.GetStreamURL looks it up.
-
-            // Correction: current handler expectation is stream_id.
-            // We need to find the stream_id from the church info. 
-            // In UserSubscription we have church info. 
-            // Let's assume for now the API accepts church ID for simplicity or we fetch it.
-            // RE-CHECK: backend/internal/handlers/user_handler.go -> GetStreamURL uses "stream_id" param
-
-            // For now, let's just use the church name to find it or fix the client call.
-            // In a real scenario we'd have the stream_id in the subscription payload.
-
-            setCurrentStream(data);
-            setIsPlaying(true);
-        } catch (err) {
-            setError('Impossibile avviare lo streaming');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const toggleNotifications = async (churchId: number, current: boolean) => {
-        try {
-            await api.put(`/user/churches/${churchId}/notifications`, { enabled: !current });
-            setSubscriptions(subs => subs.map(s => s.church_id === churchId ? { ...s, notifications_enabled: !current } : s));
-        } catch (err) {
-            // handle error
-        }
-    };
-
-    if (loading && subscriptions.length === 0) return <div className="p-8 text-center text-surface-400">Caricamento...</div>;
+    const liveCount = subscriptions.filter((s) => s.streaming_active).length;
 
     return (
-        <div className="px-4 py-6 space-y-8">
-            {error && (
-                <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm py-3 px-4 rounded-xl">
-                    {error}
+        <div className="px-4 py-6 space-y-6">
+            {/* Greeting */}
+            <div>
+                <h1 className="text-xl font-bold">Ciao, {user?.name || 'Benvenuto'}</h1>
+                {liveCount > 0 ? (
+                    <p className="text-red-400 text-sm mt-0.5 flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse" />
+                        {liveCount} {liveCount === 1 ? 'chiesa in diretta' : 'chiese in diretta'}
+                    </p>
+                ) : (
+                    <p className="text-surface-400 text-sm mt-0.5">Le tue parrocchie</p>
+                )}
+            </div>
+
+            {/* Content */}
+            {loading ? (
+                <Loading />
+            ) : subscriptions.length === 0 ? (
+                <div className="card text-center py-12 space-y-3">
+                    <svg className="w-12 h-12 text-surface-600 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <p className="text-surface-400">Non segui ancora nessuna parrocchia</p>
+                    <Link to="/explore" className="btn-primary inline-block">
+                        Esplora le chiese
+                    </Link>
+                </div>
+            ) : (
+                <div className="space-y-3">
+                    {/* Live churches first */}
+                    {subscriptions
+                        .sort((a, b) => (b.streaming_active ? 1 : 0) - (a.streaming_active ? 1 : 0))
+                        .map((sub) => (
+                            <SubscriptionCard key={sub.subscription_id} subscription={sub} />
+                        ))}
                 </div>
             )}
-            {/* Live Now Section */}
-            <section className="space-y-4">
-                <h2 className="text-xl font-bold flex items-center gap-2">
-                    <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                    In Diretta Ora
-                </h2>
+        </div>
+    );
+}
 
-                <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
-                    {subscriptions.filter(s => s.streaming_active).map(sub => (
-                        <div key={sub.church_id} className="flex-shrink-0 w-48 card space-y-3">
-                            <div className="aspect-square bg-surface-800 rounded-xl overflow-hidden relative group">
-                                {sub.church_logo_url ? (
-                                    <img src={sub.church_logo_url} alt={sub.church_name} className="w-full h-full object-cover" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-surface-600">
-                                        <Volume2 size={48} />
-                                    </div>
-                                )}
-                                <button
-                                    onClick={() => handlePlay(sub.church_id)}
-                                    className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                >
-                                    <Play fill="white" size={32} className="text-white" />
-                                </button>
-                            </div>
-                            <div className="space-y-1">
-                                <h3 className="font-semibold text-sm truncate">{sub.church_name}</h3>
-                                <span className="badge-live">LIVE</span>
-                            </div>
-                        </div>
-                    ))}
-                    {subscriptions.filter(s => s.streaming_active).length === 0 && (
-                        <div className="text-surface-500 text-sm py-8 px-4 border border-dashed border-white/10 rounded-2xl w-full text-center">
-                            Nessuna chiesa seguita è attualmente live
-                        </div>
-                    )}
-                </div>
-            </section>
+// ============================================
+// Subscription Card
+// ============================================
 
-            {/* My Subscriptions */}
-            <section className="space-y-4">
-                <h2 className="text-xl font-bold">Le tue Parrocchie</h2>
-                <div className="grid gap-3">
-                    {subscriptions.map(sub => (
-                        <div key={sub.church_id} className="card flex items-center gap-4">
-                            <div className="w-12 h-12 bg-surface-800 rounded-lg flex-shrink-0 overflow-hidden">
-                                {sub.church_logo_url && <img src={sub.church_logo_url} className="w-full h-full object-cover" />}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <h3 className="font-semibold truncate">{sub.church_name}</h3>
-                                <p className="text-xs text-surface-400">Iscritto da {new Date(sub.subscribed_at).toLocaleDateString()}</p>
-                            </div>
-                            <button
-                                onClick={() => toggleNotifications(sub.church_id, sub.notifications_enabled)}
-                                className={sub.notifications_enabled ? 'text-primary-500' : 'text-surface-500'}
-                            >
-                                {sub.notifications_enabled ? <Bell size={20} /> : <BellOff size={20} />}
-                            </button>
-                        </div>
-                    ))}
-                </div>
-            </section>
+function SubscriptionCard({ subscription: sub }: { subscription: SubscriptionEntry }) {
+    return (
+        <Link
+            to={sub.streaming_active ? `/listen/${sub.church_id}` : `/churches/${sub.church_id}`}
+            className={`card flex items-center gap-4 transition-colors ${sub.streaming_active
+                    ? 'border-red-500/30 bg-red-500/5 hover:bg-red-500/10'
+                    : 'hover:border-surface-600'
+                }`}
+        >
+            {/* Church avatar */}
+            <div className="w-12 h-12 rounded-xl bg-surface-700 flex items-center justify-center shrink-0 overflow-hidden">
+                {sub.church_logo_url ? (
+                    <img src={sub.church_logo_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                    <svg className="w-6 h-6 text-surface-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                )}
+            </div>
 
-            {/* Sticky Player (if active) */}
-            {currentStream && (
-                <div className="fixed bottom-24 left-4 right-4 bg-primary-600/95 backdrop-blur-lg rounded-2xl p-4 shadow-2xl flex items-center gap-4 animate-in fade-in slide-in-from-bottom-5">
-                    <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                        <Volume2 size={20} className="text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-bold text-white truncate">{currentStream.church_name}</h4>
-                        <p className="text-[10px] text-white/70 uppercase tracking-widest font-bold">Live Streaming</p>
-                    </div>
-                    <button
-                        onClick={() => {
-                            if (isPlaying) {
-                                audioRef.current?.pause();
-                                setIsPlaying(false);
-                            } else {
-                                audioRef.current?.play();
-                                setIsPlaying(true);
-                            }
-                        }}
-                        className="w-10 h-10 bg-white text-primary-600 rounded-full flex items-center justify-center shadow-lg"
-                    >
-                        {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-0.5" />}
-                    </button>
-                    <audio
-                        ref={audioRef}
-                        src={currentStream.stream_url}
-                        autoPlay
-                        onPlay={() => setIsPlaying(true)}
-                        onPause={() => setIsPlaying(false)}
-                    />
+            {/* Info */}
+            <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{sub.church_name}</p>
+                {sub.streaming_active ? (
+                    <p className="text-red-400 text-sm flex items-center gap-1.5 mt-0.5">
+                        <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse" />
+                        In diretta — tocca per ascoltare
+                    </p>
+                ) : (
+                    <p className="text-surface-500 text-sm mt-0.5">Offline</p>
+                )}
+            </div>
+
+            {/* Play indicator */}
+            {sub.streaming_active && (
+                <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center shrink-0">
+                    <svg className="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z" />
+                    </svg>
                 </div>
             )}
+        </Link>
+    );
+}
+
+// ============================================
+// Loading
+// ============================================
+
+function Loading() {
+    return (
+        <div className="flex justify-center py-12">
+            <svg className="animate-spin h-8 w-8 text-primary-500" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
         </div>
     );
 }

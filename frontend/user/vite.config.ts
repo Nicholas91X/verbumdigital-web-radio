@@ -14,24 +14,16 @@ export default defineConfig({
             registerType: 'autoUpdate',
             includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
             manifest: {
-                name: 'VerbumDigital',
-                short_name: 'VerbumDigital',
-                description: 'Ascolta le tue parrocchie preferite',
+                name: 'VerbumDigital - Radio Parrocchiale',
+                short_name: 'VD Radio',
+                description: 'Ascolta le trasmissioni della tua parrocchia',
                 theme_color: '#1e293b',
                 background_color: '#0f172a',
                 display: 'standalone',
                 orientation: 'portrait',
                 icons: [
-                    {
-                        src: 'pwa-192x192.png',
-                        sizes: '192x192',
-                        type: 'image/png',
-                    },
-                    {
-                        src: 'pwa-512x512.png',
-                        sizes: '512x512',
-                        type: 'image/png',
-                    },
+                    { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+                    { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
                 ],
             },
         }) as PluginOption,
@@ -43,6 +35,10 @@ export default defineConfig({
         },
     },
     server: {
-        port: 3000,
+        port: 3002,
     },
 });
+
+
+
+

@@ -13,7 +13,7 @@ interface AuthContextType {
     user: AuthUser | null;
     isLoading: boolean;
     login: (credentials: LoginRequest) => Promise<void>;
-    register: (details: RegisterRequest) => Promise<void>;
+    register: (data: RegisterRequest) => Promise<void>;
     logout: () => void;
 }
 
@@ -32,8 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
     }, []);
 
-    const login = useCallback(async (credentials: LoginRequest) => {
-        const data = await api.post<AuthResponse>('/auth/user/login', credentials, false);
+    const handleAuthResponse = useCallback((data: AuthResponse) => {
         const authUser: AuthUser = {
             id: data.user.id,
             name: data.user.name,
@@ -44,17 +43,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(authUser);
     }, []);
 
-    const register = useCallback(async (details: RegisterRequest) => {
-        const data = await api.post<AuthResponse>('/auth/user/register', details, false);
-        const authUser: AuthUser = {
-            id: data.user.id,
-            name: data.user.name,
-            email: data.user.email,
-            role: data.user.role,
-        };
-        setAuth(data.token, authUser);
-        setUser(authUser);
-    }, []);
+    const login = useCallback(async (credentials: LoginRequest) => {
+        const data = await api.post<AuthResponse>('/auth/user/login', credentials, false);
+        handleAuthResponse(data);
+    }, [handleAuthResponse]);
+
+    const register = useCallback(async (regData: RegisterRequest) => {
+        const data = await api.post<AuthResponse>('/auth/user/register', regData, false);
+        handleAuthResponse(data);
+    }, [handleAuthResponse]);
 
     const logout = useCallback(() => {
         clearAuth();
