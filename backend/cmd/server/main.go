@@ -12,7 +12,7 @@ import (
 	"github.com/verbumdigital/web-radio/internal/handlers"
 	"github.com/verbumdigital/web-radio/internal/middleware"
 	"github.com/verbumdigital/web-radio/internal/services"
-	"gorm.io/driver/postgres"
+	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -25,7 +25,7 @@ func main() {
 	}
 
 	// Connect to database
-	db, err := gorm.Open(postgres.Open(cfg.DSN()), &gorm.Config{
+	db, err := gorm.Open(mysql.Open(cfg.DSN()), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
 	})
 	if err != nil {

@@ -17,15 +17,15 @@ type Config struct {
 	DBUser     string
 	DBPassword string
 	DBName     string
-	DBSSLMode  string
 
 	// JWT
 	JWTSecret          string
 	JWTExpirationHours string
 
 	// ST1 / Icecast
-	IcecastBaseURL string
-	DeviceAPIKey   string
+	IcecastBaseURL        string
+	IcecastSourcePassword string
+	DeviceAPIKey          string
 }
 
 func Load() (*Config, error) {
@@ -33,17 +33,17 @@ func Load() (*Config, error) {
 	godotenv.Load()
 
 	cfg := &Config{
-		Port:               getEnv("PORT", "8081"),
-		DBHost:             getEnv("DB_HOST", "localhost"),
-		DBPort:             getEnv("DB_PORT", "5432"),
-		DBUser:             getEnv("DB_USER", "st1stream"),
-		DBPassword:         getEnv("DB_PASSWORD", ""),
-		DBName:             getEnv("DB_NAME", "st1stream"),
-		DBSSLMode:          getEnv("DB_SSLMODE", "disable"),
-		JWTSecret:          getEnv("JWT_SECRET", ""),
-		JWTExpirationHours: getEnv("JWT_EXPIRATION_HOURS", "72"),
-		IcecastBaseURL:     getEnv("ICECAST_BASE_URL", "http://vdserv.com:8000"),
-		DeviceAPIKey:       getEnv("DEVICE_API_KEY", ""),
+		Port:                  getEnv("PORT", "8081"),
+		DBHost:                getEnv("DB_HOST", "localhost"),
+		DBPort:                getEnv("DB_PORT", "3306"),
+		DBUser:                getEnv("DB_USER", "st1stream"),
+		DBPassword:            getEnv("DB_PASSWORD", ""),
+		DBName:                getEnv("DB_NAME", "st1stream"),
+		JWTSecret:             getEnv("JWT_SECRET", ""),
+		JWTExpirationHours:    getEnv("JWT_EXPIRATION_HOURS", "72"),
+		IcecastBaseURL:        getEnv("ICECAST_BASE_URL", "http://vdserv.com:8000"),
+		IcecastSourcePassword: getEnv("ICECAST_SOURCE_PASSWORD", ""),
+		DeviceAPIKey:          getEnv("DEVICE_API_KEY", ""),
 	}
 
 	if cfg.DBPassword == "" {
@@ -55,14 +55,17 @@ func Load() (*Config, error) {
 	if cfg.DeviceAPIKey == "" {
 		return nil, fmt.Errorf("DEVICE_API_KEY is required")
 	}
+	if cfg.IcecastSourcePassword == "" {
+		return nil, fmt.Errorf("ICECAST_SOURCE_PASSWORD is required")
+	}
 
 	return cfg, nil
 }
 
 func (c *Config) DSN() string {
 	return fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		c.DBHost, c.DBPort, c.DBUser, c.DBPassword, c.DBName, c.DBSSLMode,
+		"%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+		c.DBUser, c.DBPassword, c.DBHost, c.DBPort, c.DBName,
 	)
 }
 
