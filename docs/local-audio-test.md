@@ -18,15 +18,27 @@ Assicurati che il database e il server Icecast siano attivi:
 docker compose up -d mysql icecast
 ```
 
+
 Il server Icecast sarà accessibile su `http://localhost:8000`.
 
 ### 2. Configurazione Backend
 
-Modifica `backend/.env` per puntare al server Icecast locale:
+Modifica `backend/.env` per usare Icecast locale invece di produzione:
 
 ```ini
+# Icecast streaming server
+# --- PRODUCTION (Hetzner Icecast) ---
 # ICECAST_BASE_URL=http://vdserv.com:8000
+# ICECAST_SOURCE_PASSWORD=r0j1e0A8bx
+
+# --- LOCAL TESTING (Docker Icecast) ---
 ICECAST_BASE_URL=http://localhost:8000
+ICECAST_SOURCE_PASSWORD=hackme
+```
+
+Aggiorna anche la password nel database:
+```bash
+docker exec vd-mysql mysql -ust1stream -p"4ifK(E)OrrQ-pi6y" -e "UPDATE streaming_credentials SET stream_key = 'hackme';" st1stream
 ```
 
 Riavvia il backend:
@@ -35,18 +47,7 @@ cd backend
 go run cmd/server/main.go
 ```
 
-### 3. Configurazione Frontend (Priest PWA)
-
-Modifica `frontend/priest/src/pages/DashboardPage.tsx` (temporaneamente) per usare l'URL locale nel metodo `handleStartStream`:
-
-```typescript
-// LOCAL TESTING:
-const streamUrl = `icecast://source:${status.stream_key}@localhost:8000/${status.stream_id}.mp3`;
-```
-
-*Nota: Ricordati di ripristinare il codice per la produzione dopo il test.*
-
-### 4. Avvio Tool di Simulazione (Mock ST1)
+### 3. Avvio Tool di Simulazione (Mock ST1)
 
 Avvia il simulatore ST1 in modalità **LIVE** per abilitare l'invio di audio reale tramite FFmpeg:
 
@@ -76,3 +77,31 @@ Dovresti vedere: `🔴 LIVE AUDIO MODE ARMED (FFmpeg)`.
   ```sql
   UPDATE streaming_credentials SET stream_key = 'hackme' WHERE id = 1;
   ```
+
+## Ripristino Configurazione Produzione
+
+Dopo aver completato i test locali, ripristina la configurazione di produzione:
+
+1. **Modifica `backend/.env`:**
+   ```ini
+   # Icecast streaming server
+   # --- PRODUCTION (Hetzner Icecast) ---
+   ICECAST_BASE_URL=http://vdserv.com:8000
+   ICECAST_SOURCE_PASSWORD=r0j1e0A8bx
+
+   # --- LOCAL TESTING (Docker Icecast) ---
+   # ICECAST_BASE_URL=http://localhost:8000
+   # ICECAST_SOURCE_PASSWORD=hackme
+   ```
+
+2. **Aggiorna la password nel database:**
+   ```bash
+   docker exec vd-mysql mysql -ust1stream -p"4ifK(E)OrrQ-pi6y" -e "UPDATE streaming_credentials SET stream_key = 'r0j1e0A8bx';" st1stream
+   ```
+
+3. **Riavvia il backend:**
+   ```bash
+   cd backend
+   go run cmd/server/main.go
+   ```
+
