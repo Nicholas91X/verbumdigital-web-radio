@@ -15,7 +15,7 @@ Questa guida spiega come testare l'intero flusso audio (Streaming -> Server -> A
 Assicurati che il database e il server Icecast siano attivi:
 
 ```bash
-docker compose up -d postgres icecast
+docker compose up -d mysql icecast
 ```
 
 Il server Icecast sarà accessibile su `http://localhost:8000`.

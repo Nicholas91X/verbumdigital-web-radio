@@ -10,7 +10,7 @@
 
 ## 1. Database (Docker Compose)
 
-Il file `docker-compose.yml` nella root del progetto avvia un container PostgreSQL 16 e applica automaticamente la migrazione `001_initial_schema.sql` al primo avvio.
+Il file `docker-compose.yml` nella root del progetto avvia un container MySQL 8.0 e applica automaticamente la migrazione `001_initial_schema.sql` al primo avvio.
 
 ```bash
 # Avvia il database
@@ -20,7 +20,7 @@ docker compose up -d
 docker compose ps
 
 # Verifica le tabelle
-docker exec vd-postgres psql -U st1stream -d st1stream -c "\dt"
+docker exec vd-mysql mysql -ust1stream -p"your_password" -e "SHOW TABLES;" st1stream
 ```
 
 ### Reset completo del database
@@ -53,12 +53,12 @@ cp .env.example backend/.env
 | Variabile | Descrizione | Default |
 |:--|:--|:--|
 | `PORT` | Porta del backend | `8081` |
-| `DB_HOST` | Host PostgreSQL | `localhost` |
-| `DB_PORT` | Porta PostgreSQL | `5432` |
+| `DB_HOST` | Host MySQL | `localhost` |
+| `DB_PORT` | Porta MySQL | `3306` |
 | `DB_USER` | Utente database | `st1stream` |
 | `DB_PASSWORD` | Password database | — |
 | `DB_NAME` | Nome database | `st1stream` |
-| `DB_SSLMODE` | SSL mode | `disable` |
+
 | `JWT_SECRET` | Chiave JWT (min 32 char) | — |
 | `JWT_EXPIRATION_HOURS` | Durata token | `720` |
 | `ICECAST_BASE_URL` | Server Icecast | `http://vdserv.com:8000` |
@@ -75,7 +75,7 @@ go run ../tools/gen-hash.go <tua-password>
 
 # Modifica tools/seed-admin.sql con l'hash generato
 # Poi esegui:
-docker exec -i vd-postgres psql -U st1stream -d st1stream < ../tools/seed-admin.sql
+docker exec -i vd-mysql mysql -ust1stream -p"your_password" st1stream < ../tools/seed-admin.sql
 ```
 
 ## 4. Avvio Servizi

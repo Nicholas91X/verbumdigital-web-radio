@@ -16,7 +16,7 @@ sh get-docker.sh
 apt install -y docker-compose-plugin
 ```
 
-## 2. Preparazione Database (PostgreSQL)
+## 2. Preparazione Database (MySQL)
 
 Su Hetzner, useremo Docker per gestire il database in modo semplice e isolato, simile all'ambiente locale.
 
@@ -30,20 +30,22 @@ Su Hetzner, useremo Docker per gestire il database in modo semplice e isolato, s
     ```yaml
     version: '3.8'
     services:
-      postgres:
-        image: postgres:16-alpine
-        container_name: vd-postgres
+      mysql:
+        image: mysql:8.0
+        container_name: vd-mysql
         restart: always
         environment:
-          POSTGRES_USER: st1stream
-          POSTGRES_PASSWORD: <PASSWORD_SICURA_DB>
-          POSTGRES_DB: st1stream
+          MYSQL_ROOT_PASSWORD: <PASSWORD_SICURA_DB>
+          MYSQL_DATABASE: st1stream
+          MYSQL_USER: st1stream
+          MYSQL_PASSWORD: <PASSWORD_SICURA_DB>
         ports:
-          - "5432:5432"
+          - "3306:3306"
         volumes:
-          - pgdata:/var/lib/postgresql/data
+          - mysqldata:/var/lib/mysql
+        command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     volumes:
-      pgdata:
+      mysqldata:
         driver: local
     ```
 
@@ -61,7 +63,7 @@ Su Hetzner, useremo Docker per gestire il database in modo semplice e isolato, s
 5.  **Esegui la migrazione**:
     Sul server:
     ```bash
-    docker exec -i vd-postgres psql -U st1stream -d st1stream < /opt/verbumdigital/database/001_initial_schema.sql
+    docker exec -i vd-mysql mysql -ust1stream -p<PASSWORD_SICURA_DB> st1stream < /opt/verbumdigital/database/001_initial_schema.sql
     ```
 
 ## 3. Preparazione e Compilazione Backend (Go)
@@ -94,11 +96,10 @@ Dobbiamo compilare l'eseguibile Go per l'architettura Linux del server (generalm
     ```ini
     PORT=8080
     DB_HOST=localhost
-    DB_PORT=5432
+    DB_PORT=3306
     DB_USER=st1stream
     DB_PASSWORD=<PASSWORD_SICURA_DB_SCELTA_PRIMA>
     DB_NAME=st1stream
-    DB_SSLMODE=disable
     
     JWT_SECRET=<GENERA_UNA_STRINGA_LUNGA_E_CASUALE>
     JWT_EXPIRATION_HOURS=720

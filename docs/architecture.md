@@ -8,7 +8,7 @@ Backend API — Go (Gin + GORM), REST, JWT auth
 3 PWA Frontend — React + Vite + Tailwind CSS (Admin, Priest, User)
 Hardware — Scheda ST1 (CPU A13 + LAN) nel mixer S-Mix, firmware smixRest
 Streaming Server — Icecast su Hetzner (formato MP3, ~1MB/min)
-Database — PostgreSQL su Hetzner
+Database — MySQL su Hetzner
 
 Divisione del lavoro
 
@@ -19,7 +19,7 @@ Nicholas → Backend API, tutte e 3 le PWA
 Architettura di sistema
 ┌─────────────┐     ┌──────────────┐     ┌─────────────────┐
 │  Admin PWA  │────▶│              │     │                 │
-└─────────────┘     │              │     │   PostgreSQL    │
+└─────────────┘     │              │     │     MySQL       │
 ┌─────────────┐     │  Backend API │────▶│   (Hetzner)     │
 │ Priest PWA  │────▶│  (Go/Gin)    │     │                 │
 └─────────────┘     │  port 8081   │     └─────────────────┘
@@ -57,7 +57,7 @@ Stack
 
 Go 1.22+
 Gin — HTTP router
-GORM — ORM per PostgreSQL
+GORM — ORM per MySQL
 golang-jwt/v5 — Autenticazione JWT
 bcrypt — Hashing password
 godotenv — Configurazione da .env
@@ -112,11 +112,10 @@ Più semplice di JWT — i device non hanno sessioni utente
 Configurazione (.env)
 PORT=8081
 DB_HOST=localhost
-DB_PORT=5432
+DB_PORT=3306
 DB_USER=st1stream
 DB_PASSWORD=***
 DB_NAME=st1stream
-DB_SSLMODE=disable
 JWT_SECRET=***
 JWT_EXPIRATION_HOURS=72
 ICECAST_BASE_URL=http://vdserv.com:8000
@@ -166,7 +165,7 @@ Overview sessioni streaming
 
 
 Database
-Schema (PostgreSQL)
+Schema (MySQL)
 10 tabelle, relazioni chiave:
 machines (1)──────(1) churches (1)──────(1) streaming_credentials
                        │

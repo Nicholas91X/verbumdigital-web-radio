@@ -18,8 +18,8 @@ Sistema di streaming audio per chiese. Un sacerdote avvia la trasmissione in dir
           ┌────────────────┼────────────────┐
           │                │                │
     ┌─────┴─────┐   ┌─────┴─────┐   ┌─────┴──────┐
-    │ PostgreSQL │   │  Icecast  │   │  ST1 Device│
-    │ :5432      │   │  :8000    │   │  :8080     │
+    │   MySQL    │   │  Icecast  │   │  ST1 Device│
+    │ :3306      │   │  :8000    │   │  :8080     │
     └───────────┘   └───────────┘   └────────────┘
 ```
 
@@ -48,7 +48,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-Questo avvia PostgreSQL ed esegue automaticamente la migrazione (`001_initial_schema.sql`).
+Questo avvia MySQL ed esegue automaticamente la migrazione (`001_initial_schema.sql`).
 
 ### 3. Crea il primo admin
 
@@ -58,7 +58,7 @@ cd backend
 go run ../tools/gen-hash.go <password>
 
 # Inserisci l'admin nel database
-docker exec -i vd-postgres psql -U st1stream -d st1stream < ../tools/seed-admin.sql
+docker exec -i vd-mysql mysql -ust1stream -p"your_password" st1stream < ../tools/seed-admin.sql
 ```
 
 Oppure modifica `tools/seed-admin.sql` con il tuo hash e le tue credenziali prima di eseguirlo.
@@ -99,7 +99,7 @@ cd frontend/user && npm install && npm run dev
 | Layer | Tecnologia | Note |
 |:--|:--|:--|
 | Backend | Go 1.23 + Gin + GORM | REST API con JWT |
-| Database | PostgreSQL 16 | 10 tabelle, schema in `backend/migrations/` |
+| Database | MySQL 8.0 | 10 tabelle, schema in `backend/migrations/` |
 | Frontend | React + Vite + TypeScript | 3 PWA separate |
 | Streaming | Icecast | Server remoto su `vdserv.com:8000` |
 | Hardware | ST1 (smixRest) | Dispositivo audio → Icecast |
@@ -133,7 +133,7 @@ verbumdigital-web-radio/
 │   └── seed-admin.sql              # SQL per creare il primo admin
 │
 ├── docs/                           # Documentazione dettagliata
-├── docker-compose.yml              # PostgreSQL per sviluppo
+├── docker-compose.yml              # MySQL per sviluppo
 ├── .env.example                    # Template variabili d'ambiente
 └── README.md
 ```
@@ -211,7 +211,7 @@ sequenceDiagram
 ## Stato Attuale (Febbraio 2026)
 
 ### ✅ Completato
-- Schema database PostgreSQL (10 tabelle + indici)
+- Schema database MySQL (10 tabelle + indici)
 - Backend Go completo: auth JWT, CRUD admin, streaming priest, sottoscrizioni user
 - Middleware: CORS, JWT auth, role-based access, device auth
 - 3 PWA frontend (Admin, Priest, User) con Vite + React + TypeScript
