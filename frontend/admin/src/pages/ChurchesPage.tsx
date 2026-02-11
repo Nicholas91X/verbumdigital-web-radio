@@ -51,58 +51,87 @@ export default function ChurchesPage() {
             ) : churches.length === 0 ? (
                 <EmptyState message="Nessuna chiesa registrata" />
             ) : (
-                <div className="card overflow-hidden p-0">
-                    <table className="w-full">
-                        <thead className="bg-surface-900/50">
-                            <tr>
-                                <th className="table-header">Nome</th>
-                                <th className="table-header">Macchina</th>
-                                <th className="table-header">Stream ID</th>
-                                <th className="table-header">Sacerdoti</th>
-                                <th className="table-header">Stato</th>
-                                <th className="table-header text-right">Azioni</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-surface-700">
-                            {churches.map((c) => (
-                                <tr key={c.id}>
-                                    <td className="table-cell">
-                                        <div className="font-medium">{c.name}</div>
-                                        {c.address && <div className="text-xs text-surface-500">{c.address}</div>}
-                                    </td>
-                                    <td className="table-cell font-mono text-surface-400 text-xs">
-                                        {c.machine?.machine_id || '—'}
-                                    </td>
-                                    <td className="table-cell font-mono text-xs text-surface-400">
-                                        {c.streaming_credential?.stream_id || '—'}
-                                    </td>
-                                    <td className="table-cell text-surface-400">
-                                        {c.priests && c.priests.length > 0
-                                            ? c.priests.map((p) => p.name).join(', ')
-                                            : '—'}
-                                    </td>
-                                    <td className="table-cell">
-                                        {c.streaming_active ? (
-                                            <span className="badge-live">
-                                                <span className="w-1.5 h-1.5 bg-red-400 rounded-full mr-1.5 animate-pulse" />
-                                                LIVE
-                                            </span>
-                                        ) : (
-                                            <span className="badge-offline">Offline</span>
-                                        )}
-                                    </td>
-                                    <td className="table-cell text-right">
-                                        <button
-                                            onClick={() => setEditChurch(c)}
-                                            className="text-xs font-medium text-primary-400 hover:text-primary-300 px-3 py-1"
-                                        >
-                                            Modifica
-                                        </button>
-                                    </td>
+                <div className="space-y-4">
+                    {/* Desktop Table */}
+                    <div className="hidden lg:block card overflow-hidden p-0">
+                        <table className="w-full">
+                            <thead className="bg-surface-900/50">
+                                <tr>
+                                    <th className="table-header">Nome</th>
+                                    <th className="table-header">Macchina</th>
+                                    <th className="table-header">Stream ID</th>
+                                    <th className="table-header text-right">Azioni</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                                {churches.map((c) => (
+                                    <tr key={c.id}>
+                                        <td className="table-cell">
+                                            <div className="font-bold text-white">{c.name}</div>
+                                            {c.address && <div className="text-xs text-surface-500 font-medium">{c.address}</div>}
+                                        </td>
+                                        <td className="table-cell font-mono text-surface-400 text-xs">
+                                            {c.machine?.machine_id || '—'}
+                                        </td>
+                                        <td className="table-cell font-mono text-xs text-surface-400">
+                                            {c.streaming_credential?.stream_id || '—'}
+                                        </td>
+                                        <td className="table-cell text-right">
+                                            <button
+                                                onClick={() => setEditChurch(c)}
+                                                className="text-xs font-bold text-primary-500 hover:text-primary-400 uppercase tracking-widest"
+                                            >
+                                                Modifica
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Mobile Cards */}
+                    <div className="lg:hidden space-y-4">
+                        {churches.map((c) => (
+                            <div key={c.id} className="card p-5 space-y-4 active:scale-100">
+                                <div className="flex justify-between items-start">
+                                    <div className="min-w-0">
+                                        <h3 className="font-extrabold text-white text-lg truncate pr-2">{c.name}</h3>
+                                        <p className="text-surface-500 text-[10px] font-bold uppercase tracking-widest mt-1 truncate">
+                                            {c.address || 'Nessun indirizzo'}
+                                        </p>
+                                    </div>
+                                    {c.streaming_active ? (
+                                        <div className="badge-live">Live</div>
+                                    ) : (
+                                        <div className="badge-offline">Offline</div>
+                                    )}
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4 py-2 border-y border-white/5">
+                                    <div className="space-y-1">
+                                        <span className="text-[10px] text-surface-500 font-bold uppercase tracking-widest">Hardware</span>
+                                        <p className="text-xs font-mono text-surface-300 truncate">
+                                            {c.machine?.machine_id || 'Non assegnato'}
+                                        </p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <span className="text-[10px] text-surface-500 font-bold uppercase tracking-widest">Stream ID</span>
+                                        <p className="text-xs font-mono text-surface-300 truncate">
+                                            {c.streaming_credential?.stream_id || 'Mancante'}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={() => setEditChurch(c)}
+                                    className="btn-ghost w-full py-3 text-xs font-bold uppercase tracking-widest"
+                                >
+                                    Modifica Dettagli
+                                </button>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
 

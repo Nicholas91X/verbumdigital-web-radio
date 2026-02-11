@@ -35,65 +35,110 @@ export default function SessionsPage() {
                     </svg>
                 </div>
             ) : sessions.length === 0 ? (
-                <div className="card text-surface-400 text-center py-12">Nessuna sessione registrata</div>
+                <div className="card text-surface-500 text-sm font-medium text-center py-12 border-dashed border-2 border-white/5 bg-transparent shadow-none">
+                    Nessuna sessione registrata
+                </div>
             ) : (
-                <div className="card overflow-hidden p-0">
-                    <table className="w-full">
-                        <thead className="bg-surface-900/50">
-                            <tr>
-                                <th className="table-header">Chiesa</th>
-                                <th className="table-header">Sacerdote</th>
-                                <th className="table-header">Inizio</th>
-                                <th className="table-header">Fine</th>
-                                <th className="table-header">Durata</th>
-                                <th className="table-header">Ascoltatori</th>
-                                <th className="table-header">Stato</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-surface-700">
-                            {sessions.map((s) => {
-                                const start = new Date(s.started_at);
-                                const end = s.ended_at ? new Date(s.ended_at) : null;
-                                const isLive = !s.ended_at;
+                <div className="space-y-4 pb-20">
+                    {/* Desktop Table */}
+                    <div className="hidden lg:block card overflow-hidden p-0">
+                        <table className="w-full">
+                            <thead className="bg-surface-900/50">
+                                <tr>
+                                    <th className="table-header">Chiesa</th>
+                                    <th className="table-header">Sacerdote</th>
+                                    <th className="table-header">Inizio</th>
+                                    <th className="table-header">Fine</th>
+                                    <th className="table-header">Durata</th>
+                                    <th className="table-header">Ascoltatori</th>
+                                    <th className="table-header">Stato</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                                {sessions.map((s) => {
+                                    const start = new Date(s.started_at);
+                                    const end = s.ended_at ? new Date(s.ended_at) : null;
+                                    const isLive = !s.ended_at;
 
-                                return (
-                                    <tr key={s.id}>
-                                        <td className="table-cell font-medium">
-                                            {s.church?.name ?? `#${s.church_id}`}
-                                        </td>
-                                        <td className="table-cell text-surface-400">
-                                            {s.priest?.name ?? '—'}
-                                        </td>
-                                        <td className="table-cell text-surface-400 text-xs">
-                                            {start.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}{' '}
-                                            {start.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
-                                        </td>
-                                        <td className="table-cell text-surface-400 text-xs">
-                                            {end
-                                                ? end.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
-                                                : '—'}
-                                        </td>
-                                        <td className="table-cell font-mono text-surface-400 text-xs">
-                                            {s.duration_seconds ? formatDuration(s.duration_seconds) : '—'}
-                                        </td>
-                                        <td className="table-cell text-surface-400 text-center">
-                                            {s.max_listener_count > 0 ? s.max_listener_count : '—'}
-                                        </td>
-                                        <td className="table-cell">
-                                            {isLive ? (
-                                                <span className="badge-live">
-                                                    <span className="w-1.5 h-1.5 bg-red-400 rounded-full mr-1.5 animate-pulse" />
-                                                    LIVE
-                                                </span>
-                                            ) : (
-                                                <span className="badge-offline">Conclusa</span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                                    return (
+                                        <tr key={s.id}>
+                                            <td className="table-cell font-bold text-white">
+                                                {s.church?.name ?? `#${s.church_id}`}
+                                            </td>
+                                            <td className="table-cell text-surface-400 font-medium">
+                                                {s.priest?.name ?? '—'}
+                                            </td>
+                                            <td className="table-cell text-surface-400 text-xs font-mono">
+                                                {start.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}{' '}
+                                                {start.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                                            </td>
+                                            <td className="table-cell text-surface-400 text-xs font-mono">
+                                                {end
+                                                    ? end.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+                                                    : '—'}
+                                            </td>
+                                            <td className="table-cell font-mono text-surface-400 text-xs">
+                                                {s.duration_seconds ? formatDuration(s.duration_seconds) : '—'}
+                                            </td>
+                                            <td className="table-cell text-surface-400 text-center font-bold">
+                                                {s.max_listener_count > 0 ? s.max_listener_count : '—'}
+                                            </td>
+                                            <td className="table-cell">
+                                                {isLive ? (
+                                                    <span className="badge-live">LIVE</span>
+                                                ) : (
+                                                    <span className="badge-offline">Fine</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Mobile List */}
+                    <div className="lg:hidden space-y-4">
+                        {sessions.map((s) => {
+                            const start = new Date(s.started_at);
+                            const isLive = !s.ended_at;
+                            return (
+                                <div key={s.id} className="card p-5 space-y-4 active:scale-100">
+                                    <div className="flex justify-between items-start">
+                                        <div className="min-w-0">
+                                            <h3 className="font-extrabold text-white text-lg truncate pr-2">
+                                                {s.church?.name || `Chiesa #${s.church_id}`}
+                                            </h3>
+                                            <p className="text-surface-500 text-[10px] font-bold uppercase tracking-widest mt-1">
+                                                {s.priest?.name || 'Sistema'}
+                                            </p>
+                                        </div>
+                                        {isLive ? (
+                                            <div className="badge-live">Live</div>
+                                        ) : (
+                                            <div className="badge-offline">Finito</div>
+                                        )}
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4 py-3 border-y border-white/5">
+                                        <div className="space-y-1">
+                                            <span className="text-[10px] text-surface-500 font-bold uppercase tracking-widest">Inizio</span>
+                                            <p className="text-xs font-mono text-surface-300">
+                                                {start.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}{' '}
+                                                {start.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                                            </p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <span className="text-[10px] text-surface-500 font-bold uppercase tracking-widest">Durata / Peak</span>
+                                            <p className="text-xs font-mono text-surface-300">
+                                                {s.duration_seconds ? formatDuration(s.duration_seconds) : '—'} / {s.max_listener_count} usr
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
                 </div>
             )}
         </div>

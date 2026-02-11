@@ -196,99 +196,126 @@ function ChurchCard({ church, onStreamChange }: ChurchCardProps) {
     };
 
     return (
-        <div className="card space-y-4">
+        <div className="card space-y-5 overflow-hidden active:scale-100 relative">
             {/* Church info */}
-            <div className="flex items-start justify-between">
-                <div>
-                    <h2 className="font-semibold text-lg">{church.name}</h2>
+            <div className="flex items-center justify-between border-b border-white/5 pb-4 -mx-5 px-5">
+                <div className="min-w-0">
+                    <h2 className="font-extrabold text-xl tracking-tight truncate pr-4">{church.name}</h2>
                     {church.address && (
-                        <p className="text-surface-400 text-sm mt-0.5">{church.address}</p>
+                        <p className="text-surface-500 text-[10px] uppercase font-bold tracking-widest mt-1 truncate">{church.address}</p>
                     )}
                 </div>
                 {isLive ? (
-                    <span className="badge-live">
-                        <span className="w-1.5 h-1.5 bg-red-400 rounded-full mr-1.5 animate-pulse" />
+                    <div className="badge-live animate-pulse">
+                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full mr-2" />
                         LIVE
-                    </span>
+                    </div>
                 ) : (
-                    <span className="badge-offline">Offline</span>
+                    <div className="badge-offline">STBY</div>
                 )}
             </div>
 
-            {/* ST1 status */}
-            {st1Error ? (
-                <div className="text-xs text-amber-400 flex items-center gap-1.5">
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                    {st1Error}
+            {/* Status & Timer Section */}
+            <div className="flex items-center justify-between py-2">
+                {/* ST1 status */}
+                <div className="space-y-1">
+                    <p className="text-[10px] uppercase font-bold text-surface-500 tracking-widest">Hardware Status</p>
+                    {st1Error ? (
+                        <div className="text-sm text-amber-500 font-bold flex items-center gap-1.5">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                            </svg>
+                            Offline
+                        </div>
+                    ) : st1Status ? (
+                        <div className="text-sm font-bold flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full ${st1Status.state === 'streaming' ? 'bg-green-500 animate-pulse' : 'bg-blue-500'}`} />
+                            <span className="capitalize">{st1Status.state}</span>
+                        </div>
+                    ) : <span className="text-surface-600 italic">Verifica...</span>}
                 </div>
-            ) : st1Status ? (
-                <div className="text-xs text-surface-400">
-                    ST1: {st1Status.state}
-                    {st1Status.state === 'streaming' && (
-                        <span className="ml-2">
-                            ({formatDuration(st1Status.current_time)})
-                        </span>
-                    )}
-                </div>
-            ) : null}
 
-            {/* Streaming time (from session) */}
-            {isLive && streamStatus?.session && (
-                <StreamTimer startedAt={streamStatus.session.started_at} />
-            )}
+                {/* Streaming time (from session) */}
+                {isLive && streamStatus?.session && (
+                    <div className="text-right">
+                        <p className="text-[10px] uppercase font-bold text-red-500/60 tracking-widest mb-1">Durata Diretta</p>
+                        <StreamTimer startedAt={streamStatus.session.started_at} />
+                    </div>
+                )}
+            </div>
 
             {/* Error */}
             {actionError && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2 text-red-400 text-sm">
+                <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-xs font-semibold">
                     {actionError}
                 </div>
             )}
 
-            {/* Actions */}
-            <div className="flex gap-3">
+            {/* MAIN ACTIONS - HUGE BUTTONS */}
+            <div className="pt-2">
                 {isLive ? (
                     <button
                         onClick={handleStop}
                         disabled={actionLoading}
-                        className="btn-danger flex-1 flex items-center justify-center gap-2"
+                        className="btn-danger w-full py-6 rounded-2xl shadow-2xl shadow-red-900/40 relative group"
                     >
                         {actionLoading ? (
                             <Spinner />
                         ) : (
-                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                                <rect x="6" y="6" width="12" height="12" rx="1" />
-                            </svg>
+                            <>
+                                <div className="absolute inset-0 bg-red-400/10 rounded-2xl opacity-0 group-active:opacity-100 transition-opacity" />
+                                <svg className="w-8 h-8 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                                    <rect x="6" y="6" width="12" height="12" rx="1" />
+                                </svg>
+                                <span className="text-xl font-black uppercase tracking-tighter">Termina Diretta</span>
+                            </>
                         )}
-                        Ferma Stream
                     </button>
                 ) : (
                     <button
                         onClick={handleStart}
                         disabled={actionLoading || !!st1Error}
-                        className="btn-primary flex-1 flex items-center justify-center gap-2"
+                        className="btn-primary w-full py-6 rounded-2xl shadow-2xl shadow-primary-900/40 relative group"
                     >
                         {actionLoading ? (
                             <Spinner />
                         ) : (
-                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M8 5v14l11-7z" />
-                            </svg>
+                            <>
+                                <div className="absolute inset-0 bg-primary-400/10 rounded-2xl opacity-0 group-active:opacity-100 transition-opacity" />
+                                <svg className="w-8 h-8 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M8 5v14l11-7z" />
+                                </svg>
+                                <span className="text-xl font-black uppercase tracking-tighter">Avvia Diretta</span>
+                            </>
                         )}
-                        Avvia Stream
                     </button>
                 )}
+            </div>
 
+            {/* Secondary Actions */}
+            <div className="grid grid-cols-2 gap-3 pt-2">
                 <Link
                     to={`/churches/${church.id}/sessions`}
-                    className="btn-ghost flex items-center gap-1.5"
+                    className="btn-ghost flex-1 py-4 text-xs tracking-tight"
                 >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    Storico
+                    Storico Sessioni
                 </Link>
+                {isLive && streamStatus && (
+                    <a
+                        href={`http://vdserv.com:8000/${streamStatus.stream_id}.mp3`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn-ghost flex-1 py-4 text-xs tracking-tight bg-surface-900 border border-white/5 active:bg-white/5"
+                    >
+                        <svg className="w-4 h-4 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 010-7.072m-2.828 9.9a9 9 0 010-12.728" />
+                        </svg>
+                        Test Audio
+                    </a>
+                )}
             </div>
         </div>
     );

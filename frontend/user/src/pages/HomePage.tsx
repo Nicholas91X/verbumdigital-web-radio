@@ -30,17 +30,21 @@ export default function HomePage() {
     const liveCount = subscriptions.filter((s) => s.streaming_active).length;
 
     return (
-        <div className="px-4 py-6 space-y-6">
-            {/* Greeting */}
-            <div>
-                <h1 className="text-xl font-bold">Ciao, {user?.name || 'Benvenuto'}</h1>
-                {liveCount > 0 ? (
-                    <p className="text-red-400 text-sm mt-0.5 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse" />
-                        {liveCount} {liveCount === 1 ? 'chiesa in diretta' : 'chiese in diretta'}
+        <div className="px-5 py-8 space-y-8 pb-32">
+            {/* Header / Greeting */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-extrabold tracking-tight">Ciao, {user?.name?.split(' ')[0] || 'Benvenuto'}</h1>
+                    <p className="text-surface-500 text-sm font-medium mt-1">
+                        {liveCount > 0
+                            ? `${liveCount} ${liveCount === 1 ? 'chiesa trasmette' : 'chiese trasmettono'} ora`
+                            : 'Esplora le tue parrocchie'}
                     </p>
-                ) : (
-                    <p className="text-surface-400 text-sm mt-0.5">Le tue parrocchie</p>
+                </div>
+                {liveCount > 0 && (
+                    <div className="w-10 h-10 bg-red-500/10 rounded-full flex items-center justify-center border border-red-500/20">
+                        <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
+                    </div>
                 )}
             </div>
 
@@ -48,17 +52,22 @@ export default function HomePage() {
             {loading ? (
                 <Loading />
             ) : subscriptions.length === 0 ? (
-                <div className="card text-center py-12 space-y-3">
-                    <svg className="w-12 h-12 text-surface-600 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                    <p className="text-surface-400">Non segui ancora nessuna parrocchia</p>
-                    <Link to="/explore" className="btn-primary inline-block">
-                        Esplora le chiese
+                <div className="card text-center py-16 space-y-4 border-dashed border-2 border-surface-800 bg-transparent shadow-none">
+                    <div className="w-16 h-16 bg-surface-900 rounded-2xl flex items-center justify-center mx-auto border border-surface-800">
+                        <svg className="w-8 h-8 text-surface-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p className="text-white font-bold text-lg">Inizia ad ascoltare</p>
+                        <p className="text-surface-500 text-sm">Non segui ancora nessuna parrocchia</p>
+                    </div>
+                    <Link to="/explore" className="btn-primary w-full max-w-[200px] mx-auto">
+                        Esplora ora
                     </Link>
                 </div>
             ) : (
-                <div className="space-y-3">
+                <div className="space-y-4 pt-2">
                     {/* Live churches first */}
                     {subscriptions
                         .sort((a, b) => (b.streaming_active ? 1 : 0) - (a.streaming_active ? 1 : 0))
@@ -79,43 +88,54 @@ function SubscriptionCard({ subscription: sub }: { subscription: SubscriptionEnt
     return (
         <Link
             to={sub.streaming_active ? `/listen/${sub.church_id}` : `/churches/${sub.church_id}`}
-            className={`card flex items-center gap-4 transition-colors ${sub.streaming_active
-                    ? 'border-red-500/30 bg-red-500/5 hover:bg-red-500/10'
-                    : 'hover:border-surface-600'
+            className={`card group flex items-center gap-4 transition-all duration-300 relative overflow-hidden ${sub.streaming_active
+                ? 'border-red-500/40 bg-red-500/[0.03] ring-1 ring-red-500/20'
+                : 'hover:border-surface-600'
                 }`}
         >
+            {/* Live Indicator overlay for active state */}
+            {sub.streaming_active && (
+                <div className="absolute top-0 right-0 px-3 py-1 bg-red-500 text-[10px] font-black uppercase tracking-tighter text-white rounded-bl-xl z-10 shadow-lg">
+                    Live
+                </div>
+            )}
+
             {/* Church avatar */}
-            <div className="w-12 h-12 rounded-xl bg-surface-700 flex items-center justify-center shrink-0 overflow-hidden">
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden border-2 transition-transform group-active:scale-95 ${sub.streaming_active ? 'border-red-500/30' : 'border-surface-800'
+                }`}>
                 {sub.church_logo_url ? (
                     <img src={sub.church_logo_url} alt="" className="w-full h-full object-cover" />
                 ) : (
-                    <svg className="w-6 h-6 text-surface-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
+                    <div className="w-full h-full bg-surface-800 flex items-center justify-center">
+                        <svg className="w-7 h-7 text-surface-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                    </div>
                 )}
             </div>
 
             {/* Info */}
-            <div className="flex-1 min-w-0">
-                <p className="font-medium truncate">{sub.church_name}</p>
+            <div className="flex-1 min-w-0 py-1">
+                <p className="font-bold text-lg leading-tight truncate pr-10">{sub.church_name}</p>
                 {sub.streaming_active ? (
-                    <p className="text-red-400 text-sm flex items-center gap-1.5 mt-0.5">
-                        <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse" />
-                        In diretta — tocca per ascoltare
-                    </p>
+                    <div className="flex items-center gap-2 mt-1.5 translate-y-[-1px]">
+                        <div className="flex items-center gap-1 text-red-500 text-[11px] font-bold uppercase tracking-wider">
+                            <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping" />
+                            <span>In onda</span>
+                        </div>
+                    </div>
                 ) : (
-                    <p className="text-surface-500 text-sm mt-0.5">Offline</p>
+                    <p className="text-surface-500 text-xs font-semibold uppercase tracking-widest mt-1.5">Offline</p>
                 )}
             </div>
 
-            {/* Play indicator */}
-            {sub.streaming_active && (
-                <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center shrink-0">
-                    <svg className="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z" />
-                    </svg>
-                </div>
-            )}
+            {/* Action Arrow */}
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${sub.streaming_active ? 'bg-red-500 text-white' : 'bg-surface-800 text-surface-600'
+                }`}>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+            </div>
         </Link>
     );
 }

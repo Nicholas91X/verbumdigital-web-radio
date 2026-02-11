@@ -54,45 +54,84 @@ export default function MachinesPage() {
             ) : machines.length === 0 ? (
                 <EmptyState message="Nessuna macchina registrata" />
             ) : (
-                <div className="card overflow-hidden p-0">
-                    <table className="w-full">
-                        <thead className="bg-surface-900/50">
-                            <tr>
-                                <th className="table-header">ID Macchina</th>
-                                <th className="table-header">Codice Attivazione</th>
-                                <th className="table-header">Chiesa</th>
-                                <th className="table-header">Stato</th>
-                                <th className="table-header text-right">Azioni</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-surface-700">
-                            {machines.map((m) => (
-                                <tr key={m.id}>
-                                    <td className="table-cell font-mono font-medium">{m.machine_id}</td>
-                                    <td className="table-cell font-mono text-surface-400">{m.activation_code || '—'}</td>
-                                    <td className="table-cell text-surface-400">{m.church?.name || '—'}</td>
-                                    <td className="table-cell">
-                                        {m.activated ? (
-                                            <span className="badge-success">Attiva</span>
-                                        ) : (
-                                            <span className="badge-warning">Inattiva</span>
-                                        )}
-                                    </td>
-                                    <td className="table-cell text-right">
-                                        <button
-                                            onClick={() => toggleActivation(m)}
-                                            className={`text-xs font-medium px-3 py-1 rounded-md transition-colors ${m.activated
-                                                    ? 'text-red-400 hover:bg-red-500/10'
-                                                    : 'text-emerald-400 hover:bg-emerald-500/10'
-                                                }`}
-                                        >
-                                            {m.activated ? 'Disattiva' : 'Attiva'}
-                                        </button>
-                                    </td>
+                <div className="space-y-4">
+                    {/* Desktop Table */}
+                    <div className="hidden lg:block card overflow-hidden p-0">
+                        <table className="w-full">
+                            <thead className="bg-surface-900/50">
+                                <tr>
+                                    <th className="table-header">ID Macchina</th>
+                                    <th className="table-header">Codice Attivazione</th>
+                                    <th className="table-header">Chiesa</th>
+                                    <th className="table-header">Stato</th>
+                                    <th className="table-header text-right">Azioni</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                                {machines.map((m) => (
+                                    <tr key={m.id}>
+                                        <td className="table-cell font-mono font-bold text-white">{m.machine_id}</td>
+                                        <td className="table-cell font-mono text-surface-400 font-medium">{m.activation_code || '—'}</td>
+                                        <td className="table-cell text-surface-400 font-medium">{m.church?.name || '—'}</td>
+                                        <td className="table-cell">
+                                            {m.activated ? (
+                                                <span className="badge-success">Attiva</span>
+                                            ) : (
+                                                <span className="badge-warning">Inattiva</span>
+                                            )}
+                                        </td>
+                                        <td className="table-cell text-right">
+                                            <button
+                                                onClick={() => toggleActivation(m)}
+                                                className={`text-xs font-black uppercase tracking-widest px-3 py-1 transition-colors ${m.activated
+                                                    ? 'text-red-500 hover:text-red-400'
+                                                    : 'text-emerald-500 hover:text-emerald-400'
+                                                    }`}
+                                            >
+                                                {m.activated ? 'Disattiva' : 'Attiva'}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Mobile Cards */}
+                    <div className="lg:hidden space-y-4">
+                        {machines.map((m) => (
+                            <div key={m.id} className="card p-5 space-y-4 active:scale-100">
+                                <div className="flex justify-between items-start">
+                                    <div className="min-w-0">
+                                        <h3 className="font-extrabold text-white text-lg font-mono truncate pr-2">{m.machine_id}</h3>
+                                        <p className="text-surface-500 text-[10px] font-bold uppercase tracking-widest mt-1 truncate">
+                                            {m.church?.name || 'Nessuna Chiesa Assegnata'}
+                                        </p>
+                                    </div>
+                                    {m.activated ? (
+                                        <div className="badge-success">Attiva</div>
+                                    ) : (
+                                        <div className="badge-warning">Inattiva</div>
+                                    )}
+                                </div>
+
+                                <div className="space-y-1 py-2 border-y border-white/5">
+                                    <span className="text-[10px] text-surface-500 font-bold uppercase tracking-widest">Codice Attivazione</span>
+                                    <p className="text-xs font-mono text-emerald-500 font-bold tracking-widest">
+                                        {m.activation_code || '—'}
+                                    </p>
+                                </div>
+
+                                <button
+                                    onClick={() => toggleActivation(m)}
+                                    className={`btn-ghost w-full py-3 text-xs font-black uppercase tracking-widest ${m.activated ? 'text-red-500 hover:bg-red-500/10' : 'text-emerald-500 hover:bg-emerald-500/10'
+                                        }`}
+                                >
+                                    {m.activated ? 'Disattiva Hardware' : 'Attiva Hardware'}
+                                </button>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
 

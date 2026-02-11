@@ -45,41 +45,85 @@ export default function PriestsPage() {
             ) : priests.length === 0 ? (
                 <EmptyState message="Nessun sacerdote registrato" />
             ) : (
-                <div className="card overflow-hidden p-0">
-                    <table className="w-full">
-                        <thead className="bg-surface-900/50">
-                            <tr>
-                                <th className="table-header">Nome</th>
-                                <th className="table-header">Email</th>
-                                <th className="table-header">Chiese assegnate</th>
-                                <th className="table-header">Registrato</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-surface-700">
-                            {priests.map((p) => (
-                                <tr key={p.id}>
-                                    <td className="table-cell font-medium">{p.name}</td>
-                                    <td className="table-cell text-surface-400">{p.email}</td>
-                                    <td className="table-cell">
-                                        {p.churches && p.churches.length > 0 ? (
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {p.churches.map((pc) => (
-                                                    <span key={pc.church_id} className="badge bg-primary-500/15 text-primary-400">
-                                                        {pc.church?.name ?? `Chiesa #${pc.church_id}`}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <span className="text-surface-500">Nessuna</span>
-                                        )}
-                                    </td>
-                                    <td className="table-cell text-surface-500 text-xs">
-                                        {new Date(p.created_at).toLocaleDateString('it-IT')}
-                                    </td>
+                <div className="space-y-4">
+                    {/* Desktop Table */}
+                    <div className="hidden lg:block card overflow-hidden p-0">
+                        <table className="w-full">
+                            <thead className="bg-surface-900/50">
+                                <tr>
+                                    <th className="table-header">Nome</th>
+                                    <th className="table-header">Email</th>
+                                    <th className="table-header">Chiese assegnate</th>
+                                    <th className="table-header">Registrato</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                                {priests.map((p) => (
+                                    <tr key={p.id}>
+                                        <td className="table-cell font-bold text-white">{p.name}</td>
+                                        <td className="table-cell text-surface-400 font-medium">{p.email}</td>
+                                        <td className="table-cell">
+                                            {p.churches && p.churches.length > 0 ? (
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {p.churches.map((pc) => (
+                                                        <span key={pc.church_id} className="badge bg-primary-500/10 text-primary-500 border-primary-500/20">
+                                                            {pc.church?.name ?? `Chiesa #${pc.church_id}`}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <span className="text-surface-500 text-xs font-bold uppercase tracking-widest">Nessuna</span>
+                                            )}
+                                        </td>
+                                        <td className="table-cell text-surface-500 text-xs font-mono">
+                                            {new Date(p.created_at).toLocaleDateString('it-IT')}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Mobile Cards */}
+                    <div className="lg:hidden space-y-4">
+                        {priests.map((p) => (
+                            <div key={p.id} className="card p-5 space-y-4 active:scale-100">
+                                <div className="flex justify-between items-start">
+                                    <div className="min-w-0">
+                                        <h3 className="font-extrabold text-white text-lg truncate pr-2">{p.name}</h3>
+                                        <p className="text-surface-500 text-[10px] font-bold uppercase tracking-widest mt-1 truncate">
+                                            {p.email}
+                                        </p>
+                                    </div>
+                                    <div className="w-10 h-10 rounded-full bg-surface-800 flex items-center justify-center text-primary-500">
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2 py-2 border-t border-white/5">
+                                    <span className="text-[10px] text-surface-500 font-bold uppercase tracking-widest">Parrocchie Gestite</span>
+                                    <div className="flex flex-wrap gap-2">
+                                        {p.churches && p.churches.length > 0 ? (
+                                            p.churches.map((pc) => (
+                                                <span key={pc.church_id} className="px-2.5 py-1 bg-primary-500/10 text-primary-500 border border-primary-500/20 rounded-lg text-[10px] font-black uppercase tracking-tighter">
+                                                    {pc.church?.name || `CH#${pc.church_id}`}
+                                                </span>
+                                            ))
+                                        ) : (
+                                            <span className="text-surface-600 text-[10px] font-bold uppercase tracking-widest italic">Nessuna Chiesa Assegnata</span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center justify-between text-[10px] text-surface-600 font-bold uppercase tracking-widest pt-2">
+                                    <span>Iscrizione</span>
+                                    <span>{new Date(p.created_at).toLocaleDateString('it-IT')}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
 
