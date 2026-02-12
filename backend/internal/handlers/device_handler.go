@@ -6,16 +6,22 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/verbumdigital/web-radio/internal/models"
+	"github.com/verbumdigital/web-radio/internal/services"
 	"gorm.io/gorm"
 )
 
 type DeviceHandler struct {
-	DB             *gorm.DB
-	IcecastBaseURL string
+	DB                  *gorm.DB
+	IcecastBaseURL      string
+	NotificationService *services.NotificationService
 }
 
-func NewDeviceHandler(db *gorm.DB, icecastBaseURL string) *DeviceHandler {
-	return &DeviceHandler{DB: db, IcecastBaseURL: icecastBaseURL}
+func NewDeviceHandler(db *gorm.DB, icecastBaseURL string, notificationService *services.NotificationService) *DeviceHandler {
+	return &DeviceHandler{
+		DB:                  db,
+		IcecastBaseURL:      icecastBaseURL,
+		NotificationService: notificationService,
+	}
 }
 
 // ============================================
@@ -146,6 +152,11 @@ func (h *DeviceHandler) StreamStarted(c *gin.Context) {
 	if txErr != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create session"})
 		return
+	}
+
+	// Trigger push notifications asynchoronously
+	if h.NotificationService != nil {
+		go h.NotificationService.NotifyChurchLive(church.ID, church.Name)
 	}
 
 	c.JSON(http.StatusOK, gin.H{

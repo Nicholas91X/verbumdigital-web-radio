@@ -3,11 +3,14 @@ import { Link } from 'react-router-dom';
 import { api } from '@shared/api/client';
 import type { SubscriptionEntry } from '@shared/api/types';
 import { useAuth } from '@/context/AuthContext';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 export default function HomePage() {
     const { user } = useAuth();
+    const { isSupported, permission, isSubscribed, subscribe, loading: pushLoading } = usePushNotifications();
     const [subscriptions, setSubscriptions] = useState<SubscriptionEntry[]>([]);
     const [loading, setLoading] = useState(true);
+    const [showBanner, setShowBanner] = useState(true);
 
     const fetchSubscriptions = useCallback(async () => {
         try {
@@ -29,8 +32,56 @@ export default function HomePage() {
 
     const liveCount = subscriptions.filter((s) => s.streaming_active).length;
 
+    // Don't show banner if permission is not 'default' or if already subscribed or not supported
+    const canShowBanner = showBanner && isSupported && permission === 'default' && !isSubscribed;
+
     return (
         <div className="px-5 py-8 space-y-8 pb-32">
+            {/* Notification Opt-in Banner */}
+            {canShowBanner && (
+                <div className="relative group animate-in fade-in slide-in-from-top duration-700">
+                    <div className="absolute -inset-1 bg-gradient-to-r from-red-500 to-orange-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
+                    <div className="relative card bg-surface-900 border-red-500/20 flex flex-col gap-4 p-5">
+                        <div className="flex items-start gap-4">
+                            <div className="w-12 h-12 bg-red-500/10 rounded-xl flex items-center justify-center shrink-0 border border-red-500/20 text-red-500">
+                                <svg className="w-6 h-6 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                </svg>
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="text-white font-bold text-base">Rimani aggiornato!</h3>
+                                <p className="text-surface-400 text-xs mt-1 leading-relaxed">
+                                    Ricevi una notifica push istantanea ogni volta che la tua parrocchia va in diretta.
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setShowBanner(false)}
+                                className="text-surface-600 hover:text-white transition-colors"
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={subscribe}
+                                disabled={pushLoading}
+                                className="btn-primary py-2 px-4 text-sm flex-1 bg-gradient-to-r from-red-600 to-red-500 border-none hover:shadow-lg hover:shadow-red-500/20"
+                            >
+                                {pushLoading ? 'Attivazione...' : 'Attiva Notifiche'}
+                            </button>
+                            <button
+                                onClick={() => setShowBanner(false)}
+                                className="bg-surface-800 text-surface-400 hover:text-white py-2 px-4 rounded-xl text-sm font-bold transition-all"
+                            >
+                                Magari dopo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Header / Greeting */}
             <div className="flex items-center justify-between">
                 <div>

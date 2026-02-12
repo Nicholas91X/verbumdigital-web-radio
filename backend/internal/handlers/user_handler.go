@@ -9,11 +9,15 @@ import (
 )
 
 type UserHandler struct {
-	UserService *services.UserService
+	UserService         *services.UserService
+	NotificationService *services.NotificationService
 }
 
-func NewUserHandler(userService *services.UserService) *UserHandler {
-	return &UserHandler{UserService: userService}
+func NewUserHandler(userService *services.UserService, notificationService *services.NotificationService) *UserHandler {
+	return &UserHandler{
+		UserService:         userService,
+		NotificationService: notificationService,
+	}
 }
 
 // ============================================
@@ -212,4 +216,56 @@ func (h *UserHandler) GetChurchStream(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, stream)
+}
+
+// ============================================
+// POST /push/subscribe
+// ============================================
+
+type PushSubscribeRequest struct {
+	Endpoint string `json:"endpoint" binding:"required"`
+	P256dh   string `json:"p256dh" binding:"required"`
+	Auth     string `json:"auth" binding:"required"`
+}
+
+func (h *UserHandler) PushSubscribe(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+
+	var req PushSubscribeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := h.NotificationService.SaveSubscription(userID, req.Endpoint, req.P256dh, req.Auth)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save push subscription"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Push subscription saved"})
+}
+
+// ============================================
+// DELETE /push/unsubscribe
+// ============================================
+
+type PushUnsubscribeRequest struct {
+	Endpoint string `json:"endpoint" binding:"required"`
+}
+
+func (h *UserHandler) PushUnsubscribe(c *gin.Context) {
+	var req PushUnsubscribeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := h.NotificationService.RemoveSubscriptionByEndpoint(req.Endpoint)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove push subscription"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Push subscription removed"})
 }

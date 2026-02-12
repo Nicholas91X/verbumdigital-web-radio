@@ -11,7 +11,11 @@ export default defineConfig({
     plugins: [
         react() as PluginOption,
         VitePWA({
+            strategies: 'injectManifest',
+            srcDir: 'src',
+            filename: '../src-sw.ts',
             registerType: 'autoUpdate',
+            injectRegister: 'auto',
             includeAssets: ['pwa-192x192.svg', 'pwa-512x512.svg'],
             manifest: {
                 name: 'VerbumDigital - Radio Parrocchiale',
@@ -28,58 +32,6 @@ export default defineConfig({
                     { src: 'pwa-192x192.svg', sizes: '192x192', type: 'image/svg+xml' },
                     { src: 'pwa-512x512.svg', sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' },
                 ],
-            },
-            workbox: {
-                // Runtime caching strategies
-                runtimeCaching: [
-                    {
-                        // API calls — network first with fallback to cache
-                        urlPattern: /\/api\/v1\/.*/i,
-                        handler: 'NetworkFirst',
-                        options: {
-                            cacheName: 'api-cache',
-                            expiration: {
-                                maxEntries: 50,
-                                maxAgeSeconds: 300, // 5 min
-                            },
-                            networkTimeoutSeconds: 10,
-                        },
-                    },
-                    {
-                        // Google Fonts CSS
-                        urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-                        handler: 'StaleWhileRevalidate',
-                        options: {
-                            cacheName: 'google-fonts-stylesheets',
-                        },
-                    },
-                    {
-                        // Google Fonts files
-                        urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
-                        handler: 'CacheFirst',
-                        options: {
-                            cacheName: 'google-fonts-webfonts',
-                            expiration: {
-                                maxEntries: 30,
-                                maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
-                            },
-                        },
-                    },
-                    {
-                        // Static assets (images, etc.)
-                        urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
-                        handler: 'CacheFirst',
-                        options: {
-                            cacheName: 'images-cache',
-                            expiration: {
-                                maxEntries: 60,
-                                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
-                            },
-                        },
-                    },
-                ],
-                // Precache app shell (auto-detected by VitePWA)
-                globPatterns: ['**/*.{js,css,html,svg}'],
             },
         }) as PluginOption,
     ],

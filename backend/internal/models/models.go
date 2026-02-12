@@ -110,8 +110,8 @@ type User struct {
 // ============================================
 type UserSubscription struct {
 	ID                   int       `gorm:"primaryKey" json:"id"`
-	UserID               int       `gorm:"not null" json:"user_id"`
-	ChurchID             int       `gorm:"not null" json:"church_id"`
+	UserID               int       `gorm:"not null;type:int" json:"user_id"`
+	ChurchID             int       `gorm:"not null;type:int" json:"church_id"`
 	NotificationsEnabled bool      `gorm:"default:true" json:"notifications_enabled"`
 	CreatedAt            time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt            time.Time `gorm:"autoUpdateTime" json:"updated_at"`
@@ -140,8 +140,8 @@ type Admin struct {
 // ============================================
 type StreamingSession struct {
 	ID                int        `gorm:"primaryKey" json:"id"`
-	ChurchID          int        `gorm:"not null" json:"church_id"`
-	StartedByPriestID *int       `json:"started_by_priest_id,omitempty"` // nil when started by ST1 hardware
+	ChurchID          int        `gorm:"not null;type:int" json:"church_id"`
+	StartedByPriestID *int       `gorm:"type:int" json:"started_by_priest_id,omitempty"` // nil when started by ST1 hardware
 	StartedAt         time.Time  `gorm:"not null" json:"started_at"`
 	EndedAt           *time.Time `json:"ended_at,omitempty"`
 	DurationSeconds   *int       `json:"duration_seconds,omitempty"`
@@ -165,4 +165,18 @@ type ActiveListener struct {
 
 	Session *StreamingSession `gorm:"foreignKey:SessionID" json:"session,omitempty"`
 	User    *User             `gorm:"foreignKey:UserID" json:"user,omitempty"`
+}
+
+// ============================================
+// PUSH SUBSCRIPTIONS (Web Push API)
+// ============================================
+type PushSubscription struct {
+	ID        int       `gorm:"primaryKey" json:"id"`
+	UserID    int       `gorm:"not null;index;type:int" json:"user_id"`
+	Endpoint  string    `gorm:"size:500;not null;uniqueIndex" json:"endpoint"`
+	P256dh    string    `gorm:"size:200;not null" json:"p256dh"`
+	Auth      string    `gorm:"size:100;not null" json:"auth"`
+	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
+
+	User *User `gorm:"foreignKey:UserID;references:ID" json:"user,omitempty"`
 }

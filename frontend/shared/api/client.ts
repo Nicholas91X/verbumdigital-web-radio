@@ -105,8 +105,8 @@ class ApiClient {
         return this.request<T>('PUT', path, body, requireAuth);
     }
 
-    delete<T>(path: string, requireAuth = true): Promise<T> {
-        return this.request<T>('DELETE', path, undefined, requireAuth);
+    delete<T>(path: string, body?: object, requireAuth = true): Promise<T> {
+        return this.request<T>('DELETE', path, body, requireAuth);
     }
 }
 

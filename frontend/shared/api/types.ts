@@ -33,6 +33,7 @@ export interface StreamingCredential {
     id: number;
     church_id: number;
     stream_id: string;
+    stream_key: string;
     created_at: string;
     updated_at: string;
 }
@@ -74,6 +75,15 @@ export interface Admin {
     id: number;
     username: string;
     email: string;
+    created_at: string;
+}
+
+export interface PushSubscription {
+    id: number;
+    user_id: number;
+    endpoint: string;
+    p256dh: string;
+    auth: string;
     created_at: string;
 }
 

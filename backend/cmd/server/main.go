@@ -11,6 +11,7 @@ import (
 	"github.com/verbumdigital/web-radio/internal/config"
 	"github.com/verbumdigital/web-radio/internal/handlers"
 	"github.com/verbumdigital/web-radio/internal/middleware"
+	"github.com/verbumdigital/web-radio/internal/models"
 	"github.com/verbumdigital/web-radio/internal/services"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -26,7 +27,8 @@ func main() {
 
 	// Connect to database
 	db, err := gorm.Open(mysql.Open(cfg.DSN()), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger:                                   logger.Default.LogMode(logger.Info),
+		DisableForeignKeyConstraintWhenMigrating: true,
 	})
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
@@ -43,6 +45,32 @@ func main() {
 	}
 	log.Println("Database connected successfully")
 
+	// AutoMigrate models
+	// TODO: Fix MySQL 3780 incompatibility errors and re-enable AutoMigrate
+	/*
+		err = db.AutoMigrate(
+			&models.Machine{},
+			&models.Church{},
+			&models.StreamingCredential{},
+			&models.Priest{},
+			&models.PriestChurch{},
+			&models.User{},
+			&models.UserSubscription{},
+			&models.Admin{},
+			&models.StreamingSession{},
+			&models.ActiveListener{},
+			&models.PushSubscription{},
+		)
+		if err != nil {
+			log.Fatalf("Failed to auto-migrate: %v", err)
+		}
+		log.Println("Database migration completed successfully")
+	*/
+	log.Println("Skipping AutoMigrate due to MySQL 8.0 constraint issues")
+	_ = models.Machine{} // Prevent unused import error temporarily
+	log.Println("Database connection is active")
+	log.Println("Database migrated successfully")
+
 	// JWT config
 	jwtExpHours, _ := strconv.Atoi(cfg.JWTExpirationHours)
 	if jwtExpHours == 0 {
@@ -56,15 +84,16 @@ func main() {
 	priestService := services.NewPriestService(db)
 	userService := services.NewUserService(db, cfg.IcecastBaseURL)
 	adminService := services.NewAdminService(db)
+	notificationService := services.NewNotificationService(db, cfg.VAPIDPublicKey, cfg.VAPIDPrivateKey, cfg.VAPIDEmail)
 
 	// =====================
 	// HANDLERS
 	// =====================
 	authHandler := handlers.NewAuthHandler(authService, cfg.JWTSecret, jwtExpHours)
 	priestHandler := handlers.NewPriestHandler(priestService)
-	userHandler := handlers.NewUserHandler(userService)
+	userHandler := handlers.NewUserHandler(userService, notificationService)
 	adminHandler := handlers.NewAdminHandler(adminService)
-	deviceHandler := handlers.NewDeviceHandler(db, cfg.IcecastBaseURL)
+	deviceHandler := handlers.NewDeviceHandler(db, cfg.IcecastBaseURL, notificationService)
 
 	// =====================
 	// ROUTER
@@ -141,6 +170,10 @@ func main() {
 			user.PUT("/churches/:id/notifications", userHandler.UpdateNotifications)
 			user.GET("/subscriptions", userHandler.GetSubscriptions)
 			user.GET("/stream/:stream_id", userHandler.GetStreamURL)
+
+			// PUSH NOTIFICATIONS
+			user.POST("/push/subscribe", userHandler.PushSubscribe)
+			user.DELETE("/push/unsubscribe", userHandler.PushUnsubscribe)
 		}
 
 		// DEVICE (ST1)

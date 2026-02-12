@@ -28,6 +28,11 @@ type Config struct {
 
 	// ST1 Device Authentication
 	DeviceAPIKey string
+
+	// webpush (VAPID)
+	VAPIDPublicKey  string
+	VAPIDPrivateKey string
+	VAPIDEmail      string
 }
 
 func Load() (*Config, error) {
@@ -45,6 +50,9 @@ func Load() (*Config, error) {
 		JWTExpirationHours: getEnv("JWT_EXPIRATION_HOURS", "72"),
 		IcecastBaseURL:     getEnv("ICECAST_BASE_URL", "http://vdserv.com:8000"),
 		DeviceAPIKey:       getEnv("DEVICE_API_KEY", ""),
+		VAPIDPublicKey:     getEnv("VAPID_PUBLIC_KEY", ""),
+		VAPIDPrivateKey:    getEnv("VAPID_PRIVATE_KEY", ""),
+		VAPIDEmail:         getEnv("VAPID_EMAIL", "admin@verbumdigital.com"),
 	}
 
 	if cfg.DBPassword == "" {
@@ -55,6 +63,9 @@ func Load() (*Config, error) {
 	}
 	if cfg.DeviceAPIKey == "" {
 		return nil, fmt.Errorf("DEVICE_API_KEY is required")
+	}
+	if cfg.VAPIDPublicKey == "" || cfg.VAPIDPrivateKey == "" {
+		return nil, fmt.Errorf("VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY are required")
 	}
 
 	return cfg, nil
