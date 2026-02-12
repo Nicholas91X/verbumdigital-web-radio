@@ -29,12 +29,20 @@ Icecast: vdserv.com:8000 — accepts dynamic mounts, single global source passwo
 ST1 hardware: Runs smixRest firmware on port 8080
 
 Key Credentials & Config
+SSH (Hetzner VPS)
+
+Host: vdserv.com (IP: 195.201.138.249)
+Port: 2200
+User: nicholas
+Auth: key-based (id_ed25519_vdserv)
+sudo: group membership confirmed, password TBD
+
 MySQL (Hetzner — localhost only)
 
 Host: localhost:3306
 User: st1stream
-Password: 4ifK(E)OrrQ-pi6yH
-Database: st1stream
+Password: 4ifK(E)OrrQ-pi6y
+Database: st1
 
 Icecast (vdserv.com:8000)
 
@@ -113,8 +121,8 @@ envPORT=8081
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=st1stream
-DB_PASSWORD=4ifK(E)OrrQ-pi6yH
-DB_NAME=st1stream
+DB_PASSWORD=4ifK(E)OrrQ-pi6y
+DB_NAME=st1
 JWT_SECRET=<min 32 chars>
 JWT_EXPIRATION_HOURS=72
 ICECAST_BASE_URL=http://vdserv.com:8000

@@ -38,7 +38,7 @@ func Load() (*Config, error) {
 		DBPort:                getEnv("DB_PORT", "3306"),
 		DBUser:                getEnv("DB_USER", "st1stream"),
 		DBPassword:            getEnv("DB_PASSWORD", ""),
-		DBName:                getEnv("DB_NAME", "st1stream"),
+		DBName:                getEnv("DB_NAME", "st1"),
 		JWTSecret:             getEnv("JWT_SECRET", ""),
 		JWTExpirationHours:    getEnv("JWT_EXPIRATION_HOURS", "72"),
 		IcecastBaseURL:        getEnv("ICECAST_BASE_URL", "http://vdserv.com:8000"),
