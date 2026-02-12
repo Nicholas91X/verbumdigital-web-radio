@@ -22,10 +22,12 @@ type Config struct {
 	JWTSecret          string
 	JWTExpirationHours string
 
-	// ST1 / Icecast
-	IcecastBaseURL        string
-	IcecastSourcePassword string
-	DeviceAPIKey          string
+	// Icecast (base URL only — used for User PWA stream URLs)
+	// Source password lives on ST1 hardware, backend doesn't need it
+	IcecastBaseURL string
+
+	// ST1 Device Authentication
+	DeviceAPIKey string
 }
 
 func Load() (*Config, error) {
@@ -33,17 +35,16 @@ func Load() (*Config, error) {
 	godotenv.Load()
 
 	cfg := &Config{
-		Port:                  getEnv("PORT", "8081"),
-		DBHost:                getEnv("DB_HOST", "localhost"),
-		DBPort:                getEnv("DB_PORT", "3306"),
-		DBUser:                getEnv("DB_USER", "st1stream"),
-		DBPassword:            getEnv("DB_PASSWORD", ""),
-		DBName:                getEnv("DB_NAME", "st1"),
-		JWTSecret:             getEnv("JWT_SECRET", ""),
-		JWTExpirationHours:    getEnv("JWT_EXPIRATION_HOURS", "72"),
-		IcecastBaseURL:        getEnv("ICECAST_BASE_URL", "http://vdserv.com:8000"),
-		IcecastSourcePassword: getEnv("ICECAST_SOURCE_PASSWORD", ""),
-		DeviceAPIKey:          getEnv("DEVICE_API_KEY", ""),
+		Port:               getEnv("PORT", "8081"),
+		DBHost:             getEnv("DB_HOST", "localhost"),
+		DBPort:             getEnv("DB_PORT", "3306"),
+		DBUser:             getEnv("DB_USER", "st1stream"),
+		DBPassword:         getEnv("DB_PASSWORD", ""),
+		DBName:             getEnv("DB_NAME", "st1"),
+		JWTSecret:          getEnv("JWT_SECRET", ""),
+		JWTExpirationHours: getEnv("JWT_EXPIRATION_HOURS", "72"),
+		IcecastBaseURL:     getEnv("ICECAST_BASE_URL", "http://vdserv.com:8000"),
+		DeviceAPIKey:       getEnv("DEVICE_API_KEY", ""),
 	}
 
 	if cfg.DBPassword == "" {
@@ -54,9 +55,6 @@ func Load() (*Config, error) {
 	}
 	if cfg.DeviceAPIKey == "" {
 		return nil, fmt.Errorf("DEVICE_API_KEY is required")
-	}
-	if cfg.IcecastSourcePassword == "" {
-		return nil, fmt.Errorf("ICECAST_SOURCE_PASSWORD is required")
 	}
 
 	return cfg, nil

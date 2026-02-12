@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/verbumdigital/web-radio/internal/models"
@@ -9,29 +10,33 @@ import (
 )
 
 type DeviceHandler struct {
-	DB *gorm.DB
+	DB             *gorm.DB
+	IcecastBaseURL string
 }
 
-func NewDeviceHandler(db *gorm.DB) *DeviceHandler {
-	return &DeviceHandler{DB: db}
+func NewDeviceHandler(db *gorm.DB, icecastBaseURL string) *DeviceHandler {
+	return &DeviceHandler{DB: db, IcecastBaseURL: icecastBaseURL}
 }
 
 // ============================================
 // REQUEST TYPES
 // ============================================
 
+// ValidateRequest — ST1 identifies itself by serial number on boot
 type ValidateRequest struct {
-	StreamID  string `json:"stream_id" binding:"required"`
-	StreamKey string `json:"stream_key" binding:"required"`
+	SerialNumber string `json:"serial_number" binding:"required"`
 }
 
+// StreamNotifyRequest — ST1 notifies stream start/stop by serial number
 type StreamNotifyRequest struct {
-	StreamID string `json:"stream_id" binding:"required"`
+	SerialNumber string `json:"serial_number" binding:"required"`
 }
 
 // ============================================
 // POST /device/validate
-// ST1 calls this to verify stream credentials before starting
+// ST1 calls this on boot to identify itself and receive Icecast config.
+// Looks up: serial_number → machine → church → streaming_credentials
+// Returns: stream_id, icecast_url, mount point
 // ============================================
 
 func (h *DeviceHandler) Validate(c *gin.Context) {
@@ -41,21 +46,17 @@ func (h *DeviceHandler) Validate(c *gin.Context) {
 		return
 	}
 
-	var cred models.StreamingCredential
-	err := h.DB.Where("stream_id = ? AND stream_key = ?", req.StreamID, req.StreamKey).First(&cred).Error
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{
+	// Find machine by serial number (machine_id column)
+	var machine models.Machine
+	if err := h.DB.Where("machine_id = ?", req.SerialNumber).First(&machine).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
 			"valid":   false,
-			"message": "Invalid stream credentials",
+			"message": "Machine not found",
 		})
 		return
 	}
 
-	// Check if the church's machine is activated
-	var church models.Church
-	h.DB.Preload("Machine").First(&church, cred.ChurchID)
-
-	if church.Machine == nil || !church.Machine.Activated {
+	if !machine.Activated {
 		c.JSON(http.StatusForbidden, gin.H{
 			"valid":   false,
 			"message": "Machine not activated",
@@ -63,17 +64,39 @@ func (h *DeviceHandler) Validate(c *gin.Context) {
 		return
 	}
 
+	// Find church linked to this machine
+	var church models.Church
+	if err := h.DB.Preload("StreamingCredential").Where("machine_id = ?", machine.ID).First(&church).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"valid":   false,
+			"message": "No church linked to this machine",
+		})
+		return
+	}
+
+	if church.StreamingCredential == nil {
+		c.JSON(http.StatusPreconditionFailed, gin.H{
+			"valid":   false,
+			"message": "No streaming credentials configured for this church",
+		})
+		return
+	}
+
+	// Return Icecast config for ST1 to store
 	c.JSON(http.StatusOK, gin.H{
-		"valid":     true,
-		"church_id": cred.ChurchID,
-		"stream_id": cred.StreamID,
+		"valid":       true,
+		"church_id":   church.ID,
+		"stream_id":   church.StreamingCredential.StreamID,
+		"icecast_url": h.IcecastBaseURL,
+		"mount":       "/" + church.StreamingCredential.StreamID + ".mp3",
 	})
 }
 
 // ============================================
 // POST /device/stream/started
-// ST1 calls this after successfully starting the stream
-// Updates DB flags if not already set by priest handler
+// ST1 calls this after successfully connecting to Icecast.
+// Creates a new streaming session and sets church as live.
+// This is the PRIMARY session creation endpoint (not priest).
 // ============================================
 
 func (h *DeviceHandler) StreamStarted(c *gin.Context) {
@@ -83,28 +106,59 @@ func (h *DeviceHandler) StreamStarted(c *gin.Context) {
 		return
 	}
 
-	// Find the church by stream_id
-	var cred models.StreamingCredential
-	if err := h.DB.Where("stream_id = ?", req.StreamID).First(&cred).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Stream not found"})
+	// Resolve serial_number → machine → church
+	church, err := h.resolveChurch(req.SerialNumber)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Ensure streaming_active is true (should already be set by priest handler)
-	h.DB.Model(&models.Church{}).
-		Where("id = ?", cred.ChurchID).
-		Update("streaming_active", true)
+	// If already streaming, return idempotent success
+	if church.StreamingActive && church.CurrentSessionID != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success":    true,
+			"church_id":  church.ID,
+			"session_id": *church.CurrentSessionID,
+			"message":    "Stream already active",
+		})
+		return
+	}
+
+	// Create session in a transaction
+	var session models.StreamingSession
+	txErr := h.DB.Transaction(func(tx *gorm.DB) error {
+		session = models.StreamingSession{
+			ChurchID:  church.ID,
+			StartedAt: time.Now(),
+			// StartedByPriestID is nil — started by hardware
+		}
+
+		if err := tx.Create(&session).Error; err != nil {
+			return err
+		}
+
+		return tx.Model(&models.Church{}).Where("id = ?", church.ID).Updates(map[string]interface{}{
+			"streaming_active":   true,
+			"current_session_id": session.ID,
+		}).Error
+	})
+
+	if txErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create session"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"success":   true,
-		"church_id": cred.ChurchID,
+		"success":    true,
+		"church_id":  church.ID,
+		"session_id": session.ID,
 	})
 }
 
 // ============================================
 // POST /device/stream/stopped
-// ST1 calls this when stream ends (e.g. connection lost, manual stop)
-// Acts as a safety net to ensure DB is consistent
+// ST1 calls this when stream ends (manual stop, connection lost, etc).
+// Closes the current session and resets church status.
 // ============================================
 
 func (h *DeviceHandler) StreamStopped(c *gin.Context) {
@@ -114,23 +168,26 @@ func (h *DeviceHandler) StreamStopped(c *gin.Context) {
 		return
 	}
 
-	var cred models.StreamingCredential
-	if err := h.DB.Where("stream_id = ?", req.StreamID).First(&cred).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Stream not found"})
+	church, err := h.resolveChurch(req.SerialNumber)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Get the church and close any open session
-	var church models.Church
-	if err := h.DB.First(&church, cred.ChurchID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Church not found"})
+	// If not streaming, return idempotent success
+	if !church.StreamingActive && church.CurrentSessionID == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success":   true,
+			"church_id": church.ID,
+			"message":   "No active stream",
+		})
 		return
 	}
 
-	h.DB.Transaction(func(tx *gorm.DB) error {
+	txErr := h.DB.Transaction(func(tx *gorm.DB) error {
 		// Close open session if exists
 		if church.CurrentSessionID != nil {
-			now := tx.NowFunc()
+			now := time.Now()
 			var session models.StreamingSession
 			if err := tx.First(&session, *church.CurrentSessionID).Error; err == nil {
 				if session.EndedAt == nil {
@@ -150,8 +207,32 @@ func (h *DeviceHandler) StreamStopped(c *gin.Context) {
 		}).Error
 	})
 
+	if txErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to close session"})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success":   true,
-		"church_id": cred.ChurchID,
+		"church_id": church.ID,
 	})
+}
+
+// ============================================
+// HELPERS
+// ============================================
+
+// resolveChurch looks up serial_number → machine → church
+func (h *DeviceHandler) resolveChurch(serialNumber string) (*models.Church, error) {
+	var machine models.Machine
+	if err := h.DB.Where("machine_id = ?", serialNumber).First(&machine).Error; err != nil {
+		return nil, err
+	}
+
+	var church models.Church
+	if err := h.DB.Where("machine_id = ?", machine.ID).First(&church).Error; err != nil {
+		return nil, err
+	}
+
+	return &church, nil
 }

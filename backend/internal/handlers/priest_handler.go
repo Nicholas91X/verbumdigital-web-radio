@@ -36,7 +36,7 @@ func (h *PriestHandler) GetChurches(c *gin.Context) {
 
 // ============================================
 // GET /priest/churches/:id/stream/status
-// Returns streaming status + credentials for ST1
+// Returns read-only streaming status (no credentials)
 // ============================================
 
 func (h *PriestHandler) GetStreamStatus(c *gin.Context) {
@@ -58,72 +58,6 @@ func (h *PriestHandler) GetStreamStatus(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, status)
-}
-
-// ============================================
-// POST /priest/churches/:id/stream/start
-// Creates session, returns credentials for ST1
-// ============================================
-
-func (h *PriestHandler) StartStream(c *gin.Context) {
-	priestID := middleware.GetUserID(c)
-	churchID, err := parseIntParam(c, "id")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid church ID"})
-		return
-	}
-
-	session, err := h.PriestService.StartStream(priestID, churchID)
-	if err != nil {
-		switch err.Error() {
-		case "church not found or access denied":
-			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
-		case "stream is already active":
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-		case "no streaming credentials configured for this church":
-			c.JSON(http.StatusPreconditionFailed, gin.H{"error": err.Error()})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start stream"})
-		}
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Stream session created",
-		"session": session,
-	})
-}
-
-// ============================================
-// POST /priest/churches/:id/stream/stop
-// Ends session, updates church status
-// ============================================
-
-func (h *PriestHandler) StopStream(c *gin.Context) {
-	priestID := middleware.GetUserID(c)
-	churchID, err := parseIntParam(c, "id")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid church ID"})
-		return
-	}
-
-	session, err := h.PriestService.StopStream(priestID, churchID)
-	if err != nil {
-		switch err.Error() {
-		case "church not found or access denied":
-			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
-		case "no active stream to stop":
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to stop stream"})
-		}
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Stream stopped",
-		"session": session,
-	})
 }
 
 // ============================================

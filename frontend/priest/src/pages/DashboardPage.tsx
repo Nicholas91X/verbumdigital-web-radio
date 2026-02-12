@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { api, st1 } from '@shared/api/client';
-import type { Church, StreamStatus, StreamActionResponse, ST1Status } from '@shared/api/types';
+import { api } from '@shared/api/client';
+import type { Church, StreamStatus } from '@shared/api/types';
 import { useAuth } from '@/context/AuthContext';
 
 export default function DashboardPage() {
@@ -23,6 +23,9 @@ export default function DashboardPage() {
 
     useEffect(() => {
         fetchChurches();
+        // Poll every 15s for live status updates
+        const interval = setInterval(fetchChurches, 15000);
+        return () => clearInterval(interval);
     }, [fetchChurches]);
 
     if (loading) {
@@ -62,11 +65,7 @@ export default function DashboardPage() {
             ) : (
                 <div className="space-y-4">
                     {churches.map((church) => (
-                        <ChurchCard
-                            key={church.id}
-                            church={church}
-                            onStreamChange={fetchChurches}
-                        />
+                        <ChurchCard key={church.id} church={church} />
                     ))}
                 </div>
             )}
@@ -75,125 +74,32 @@ export default function DashboardPage() {
 }
 
 // ============================================
-// Church Card with stream controls
+// Church Card — read-only monitoring
 // ============================================
 
 interface ChurchCardProps {
     church: Church;
-    onStreamChange: () => void;
 }
 
-function ChurchCard({ church, onStreamChange }: ChurchCardProps) {
-    const [actionLoading, setActionLoading] = useState(false);
-    const [actionError, setActionError] = useState('');
+function ChurchCard({ church }: ChurchCardProps) {
     const [streamStatus, setStreamStatus] = useState<StreamStatus | null>(null);
-    const [st1Status, setSt1Status] = useState<ST1Status | null>(null);
-    const [st1Error, setSt1Error] = useState('');
 
-    // Fetch detailed stream status
+    // Poll stream status for live timer
     useEffect(() => {
         const fetchStatus = async () => {
             try {
                 const status = await api.get<StreamStatus>(`/priest/churches/${church.id}/stream/status`);
                 setStreamStatus(status);
             } catch {
-                // ignore - church data already has streaming_active
+                // ignore — church data already has streaming_active
             }
         };
         fetchStatus();
+        const interval = setInterval(fetchStatus, 10000);
+        return () => clearInterval(interval);
     }, [church.id]);
 
-    // Check ST1 reachability
-    useEffect(() => {
-        const checkST1 = async () => {
-            try {
-                const status = await st1.get<ST1Status>('/api/device/st1/status');
-                setSt1Status(status);
-                setSt1Error('');
-            } catch {
-                setSt1Error('ST1 non raggiungibile');
-            }
-        };
-        checkST1();
-        // Poll every 10s while streaming
-        const interval = setInterval(checkST1, 10000);
-        return () => clearInterval(interval);
-    }, []);
-
-    const isLive = church.streaming_active;
-
-    const handleStart = async () => {
-        setActionLoading(true);
-        setActionError('');
-
-        try {
-            // 1. Create session on backend
-            await api.post<StreamActionResponse>(
-                `/priest/churches/${church.id}/stream/start`
-            );
-
-            // 2. Get credentials from stream status
-            const status = await api.get<StreamStatus>(
-                `/priest/churches/${church.id}/stream/status`
-            );
-
-            if (!status.stream_id || !status.stream_key) {
-                throw new Error('Credenziali streaming non disponibili');
-            }
-
-            // 3. Configure ST1 with stream URL
-            // PRODUCTION:
-            // const streamUrl = `icecast://source:${status.stream_key}@vdserv.com:8000/${status.stream_id}.mp3`;
-
-            // LOCAL TESTING (with docker-compose + mock-st1 --live):
-            const streamUrl = `icecast://source:${status.stream_key}@localhost:8000/${status.stream_id}.mp3`;
-
-            await st1.post('/api/device/st1/setup', { stream_url: streamUrl });
-
-            // 4. Start streaming on ST1
-            await st1.post('/api/device/st1/play');
-
-            setStreamStatus(status);
-            onStreamChange();
-        } catch (err) {
-            setActionError(err instanceof Error ? err.message : 'Errore avvio stream');
-            // If backend session was created but ST1 failed, try to clean up
-            try {
-                await api.post(`/priest/churches/${church.id}/stream/stop`);
-            } catch {
-                // cleanup failed, user will need to retry
-            }
-            onStreamChange();
-        } finally {
-            setActionLoading(false);
-        }
-    };
-
-    const handleStop = async () => {
-        setActionLoading(true);
-        setActionError('');
-
-        try {
-            // 1. Stop ST1
-            try {
-                await st1.post('/api/device/st1/stop');
-            } catch {
-                // ST1 might be unreachable, continue with backend stop
-            }
-
-            // 2. Close session on backend
-            await api.post<StreamActionResponse>(
-                `/priest/churches/${church.id}/stream/stop`
-            );
-
-            setStreamStatus(null);
-            onStreamChange();
-        } catch (err) {
-            setActionError(err instanceof Error ? err.message : 'Errore stop stream');
-        } finally {
-            setActionLoading(false);
-        }
-    };
+    const isLive = streamStatus?.streaming_active ?? church.streaming_active;
 
     return (
         <div className="card space-y-5 overflow-hidden active:scale-100 relative">
@@ -217,22 +123,20 @@ function ChurchCard({ church, onStreamChange }: ChurchCardProps) {
 
             {/* Status & Timer Section */}
             <div className="flex items-center justify-between py-2">
-                {/* ST1 status */}
+                {/* Connection status */}
                 <div className="space-y-1">
-                    <p className="text-[10px] uppercase font-bold text-surface-500 tracking-widest">Hardware Status</p>
-                    {st1Error ? (
-                        <div className="text-sm text-amber-500 font-bold flex items-center gap-1.5">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                            </svg>
-                            Offline
-                        </div>
-                    ) : st1Status ? (
+                    <p className="text-[10px] uppercase font-bold text-surface-500 tracking-widest">Stato</p>
+                    {isLive ? (
                         <div className="text-sm font-bold flex items-center gap-2">
-                            <span className={`w-2 h-2 rounded-full ${st1Status.state === 'streaming' ? 'bg-green-500 animate-pulse' : 'bg-blue-500'}`} />
-                            <span className="capitalize">{st1Status.state}</span>
+                            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                            <span>In diretta</span>
                         </div>
-                    ) : <span className="text-surface-600 italic">Verifica...</span>}
+                    ) : (
+                        <div className="text-sm font-bold flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-surface-600" />
+                            <span className="text-surface-400">In attesa</span>
+                        </div>
+                    )}
                 </div>
 
                 {/* Streaming time (from session) */}
@@ -244,78 +148,24 @@ function ChurchCard({ church, onStreamChange }: ChurchCardProps) {
                 )}
             </div>
 
-            {/* Error */}
-            {actionError && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-xs font-semibold">
-                    {actionError}
+            {/* Info banner */}
+            {!isLive && (
+                <div className="bg-surface-800/50 border border-white/5 rounded-xl px-4 py-3 text-surface-400 text-xs">
+                    La diretta viene gestita direttamente dall'hardware ST1. Qui puoi monitorare lo stato in tempo reale.
                 </div>
             )}
 
-            {/* MAIN ACTIONS - HUGE BUTTONS */}
-            <div className="pt-2">
-                {isLive ? (
-                    <button
-                        onClick={handleStop}
-                        disabled={actionLoading}
-                        className="btn-danger w-full py-6 rounded-2xl shadow-2xl shadow-red-900/40 relative group"
-                    >
-                        {actionLoading ? (
-                            <Spinner />
-                        ) : (
-                            <>
-                                <div className="absolute inset-0 bg-red-400/10 rounded-2xl opacity-0 group-active:opacity-100 transition-opacity" />
-                                <svg className="w-8 h-8 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                                    <rect x="6" y="6" width="12" height="12" rx="1" />
-                                </svg>
-                                <span className="text-xl font-black uppercase tracking-tighter">Termina Diretta</span>
-                            </>
-                        )}
-                    </button>
-                ) : (
-                    <button
-                        onClick={handleStart}
-                        disabled={actionLoading || !!st1Error}
-                        className="btn-primary w-full py-6 rounded-2xl shadow-2xl shadow-primary-900/40 relative group"
-                    >
-                        {actionLoading ? (
-                            <Spinner />
-                        ) : (
-                            <>
-                                <div className="absolute inset-0 bg-primary-400/10 rounded-2xl opacity-0 group-active:opacity-100 transition-opacity" />
-                                <svg className="w-8 h-8 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M8 5v14l11-7z" />
-                                </svg>
-                                <span className="text-xl font-black uppercase tracking-tighter">Avvia Diretta</span>
-                            </>
-                        )}
-                    </button>
-                )}
-            </div>
-
             {/* Secondary Actions */}
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            <div className="pt-2">
                 <Link
                     to={`/churches/${church.id}/sessions`}
-                    className="btn-ghost flex-1 py-4 text-xs tracking-tight"
+                    className="btn-ghost w-full py-4 text-xs tracking-tight"
                 >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     Storico Sessioni
                 </Link>
-                {isLive && streamStatus && (
-                    <a
-                        href={`http://vdserv.com:8000/${streamStatus.stream_id}.mp3`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn-ghost flex-1 py-4 text-xs tracking-tight bg-surface-900 border border-white/5 active:bg-white/5"
-                    >
-                        <svg className="w-4 h-4 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 010-7.072m-2.828 9.9a9 9 0 010-12.728" />
-                        </svg>
-                        Test Audio
-                    </a>
-                )}
             </div>
         </div>
     );
@@ -349,13 +199,4 @@ function formatDuration(totalSeconds: number): string {
     const s = totalSeconds % 60;
     const pad = (n: number) => n.toString().padStart(2, '0');
     return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
-}
-
-function Spinner() {
-    return (
-        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-        </svg>
-    );
 }

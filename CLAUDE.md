@@ -1,32 +1,34 @@
 CLAUDE.md — VerbumDigital Web Radio Platform
 Project Overview
-VerbumDigital is a church live streaming platform. Churches install an ST1 hardware encoder that streams audio to an Icecast server. Priests control streaming via a PWA, users (fedeli) listen via another PWA, and admins manage the system via a third PWA.
+VerbumDigital is a church live streaming platform. Churches install an ST1 hardware encoder that streams audio to an Icecast server. The ST1 hardware is the stream initiator — controlled locally by av-control (a PWA running on the ST1 itself). Priests monitor streaming status via a read-only PWA, users (fedeli) listen via another PWA, and admins manage the system via a third PWA.
 Architecture
-Priest PWA ──→ ST1 (LAN, smixRest API) ──→ Icecast (vdserv.com:8000)
-     │                                              │
-     └──→ Backend API (Hetzner) ←── User PWA listens from Icecast
-              │
-           MySQL DB
-Critical: The Priest PWA talks to ST1 directly over LAN (same WiFi). The backend does NOT proxy ST1 commands. The backend only manages sessions, auth, and metadata.
+av-control (ST1, port 80) ──→ smixRest (ST1, port 8080) ──→ Icecast (vdserv.com:8000)
+                                        │ (callbacks)
+                                        ▼
+                               Backend API (Hetzner:8081) ←── Priest PWA (read-only monitoring)
+                                        │                 ←── User PWA (listen)
+                                        │                 ←── Admin PWA (manage)
+                                     MySQL DB
+Critical: The Priest PWA does NOT control ST1. It is read-only (monitoring + session history). Stream control happens entirely through av-control → smixRest locally. The backend receives callbacks from ST1 for session lifecycle (validate, started, stopped).
 Tech Stack
 Backend (Go)
 
 Framework: Gin + GORM
-Database: MySQL 8 (migrated from PostgreSQL — Feb 2026)
-Auth: JWT + RBAC (3 roles: admin, priest, user)
-30 REST endpoints: See docs/api-reference.md
+Database: MySQL 8
+Auth: JWT + RBAC (3 roles: admin, priest, user) + API Key (ST1 devices)
+REST endpoints: See docs/api-reference.md
 
 Frontend (3 PWAs, all React + Vite + TypeScript + Tailwind)
 
 Admin PWA (port 3000): Machine/church/priest CRUD, dashboard, session overview
-Priest PWA (port 3001): Stream control (start/stop via ST1), session history
+Priest PWA (port 3001): Read-only — stream status monitoring, session history
 User PWA (port 3002): Browse churches, subscribe, listen to live audio
 
 Infrastructure
 
 Server: Hetzner VPS (Svilen manages)
 Icecast: vdserv.com:8000 — accepts dynamic mounts, single global source password
-ST1 hardware: Runs smixRest firmware on port 8080
+ST1 hardware: Runs smixRest firmware on port 8080, av-control on port 80
 
 Key Credentials & Config
 SSH (Hetzner VPS)
@@ -60,26 +62,34 @@ POST /api/device/st1/setup body { "stream_url": "icecast://source:r0j1e0A8bx@vds
 POST /api/device/st1/play → { "success": true }
 POST /api/device/st1/stop → { "success": true }
 
-Streaming Flow (end-to-end)
+Streaming Flow (ST1-driven, end-to-end)
 
-Priest opens PWA → logs in → selects church
-PWA calls GET /api/v1/priest/churches/:id/stream/status → gets stream_id + stream_key
-PWA calls ST1 directly (LAN): POST /setup with Icecast URL, then POST /play
-PWA calls backend: POST /api/v1/priest/churches/:id/stream/start → creates session
+av-control (local PWA on ST1) → smixRest: POST /setup with Icecast URL, then POST /play
+ST1 → Backend: POST /device/validate { "serial_number": "SMIX-12345" }
+Backend looks up: serial → machine → church → streaming_credentials
+Returns: { icecast_url, stream_id, mount }
+ST1 → Backend: POST /device/stream/started { "serial_number": "SMIX-12345" }
+Backend creates session (started_by_priest_id = null)
 ST1 pushes audio to Icecast at vdserv.com:8000/{stream_id}.mp3
+Priest PWA polls GET /stream/status — sees live timer
 User PWA detects live status, plays http://vdserv.com:8000/{stream_id}.mp3
-Priest stops: PWA calls ST1 POST /stop, then backend POST /stream/stop
+av-control → smixRest: POST /stop
+ST1 → Backend: POST /device/stream/stopped — backend closes session
 
 Database Schema (MySQL)
 10 tables: machines, churches, streaming_credentials, priests, priest_churches, users, user_subscriptions, admins, streaming_sessions, active_listeners
-Migration file: migrations/001_initial_schema.sql (MySQL syntax)
+Migration files:
+
+migrations/001_initial_schema.sql (MySQL syntax)
+migrations/002_st1_architecture.sql (stream_key nullable, ST1 changes)
+
 Key relationships:
 
 churches → machines (1:1)
-churches → streaming_credentials (1:1)
+churches → streaming_credentials (1:1, stream_key deprecated/nullable)
 priests ↔ churches via priest_churches (N:N)
 users ↔ churches via user_subscriptions (N:N)
-streaming_sessions → churches, → priests
+streaming_sessions → churches (started_by_priest_id nullable for ST1 sessions)
 
 Project Structure
 backend/
@@ -91,24 +101,33 @@ backend/
 │   ├── handlers/               # HTTP handlers per role
 │   │   ├── admin_handler.go
 │   │   ├── auth_handler.go
-│   │   ├── device_handler.go
-│   │   ├── priest_handler.go
+│   │   ├── device_handler.go   # ST1 callbacks (validate, started, stopped)
+│   │   ├── priest_handler.go   # Read-only (status, sessions)
 │   │   └── user_handler.go
 │   └── services/               # Business logic per role
 │       ├── admin_service.go
 │       ├── auth_service.go
-│       ├── priest_service.go
+│       ├── priest_service.go   # Read-only (no start/stop)
 │       └── user_service.go
 ├── migrations/
 │   ├── 001_initial_schema.sql
-│   └── 001_initial_schema_down.sql
+│   ├── 001_initial_schema_down.sql
+│   └── 002_st1_architecture.sql
 ├── go.mod
 ├── go.sum
 └── .env
 
-priest-pwa/                     # React + Vite + TS + Tailwind
-user-pwa/                       # React + Vite + TS + Tailwind
-admin-pwa/                      # React + Vite + TS + Tailwind (TBD)
+frontend/
+├── shared/
+│   ├── api/
+│   │   ├── client.ts           # API client (backend only, no ST1Client)
+│   │   └── types.ts            # TypeScript types (no ST1 types)
+│   ├── components/
+│   └── utils/
+├── admin/                      # PWA Admin
+├── priest/                     # PWA Priest (read-only monitoring)
+└── user/                       # PWA User (fedeli)
+
 docs/
 ├── architecture.md
 ├── api-reference.md
@@ -126,64 +145,33 @@ DB_NAME=st1
 JWT_SECRET=<min 32 chars>
 JWT_EXPIRATION_HOURS=72
 ICECAST_BASE_URL=http://vdserv.com:8000
-ICECAST_SOURCE_PASSWORD=r0j1e0A8bx
 DEVICE_API_KEY=<shared secret for ST1 auth>
-Recent Changes (Feb 11, 2026)
-MySQL Migration (from PostgreSQL)
-Files changed:
-
-go.mod: gorm.io/driver/postgres → gorm.io/driver/mysql v1.5.7
-config.go: DSN format changed to user:pass@tcp(host:port)/db?charset=utf8mb4&parseTime=True&loc=Local, default port 3306, removed DBSSLMode, added IcecastSourcePassword
-main.go: import gorm.io/driver/mysql, call mysql.Open()
-001_initial_schema.sql: SERIAL → INT AUTO_INCREMENT, BOOLEAN → TINYINT(1), DEFAULT NOW() → DEFAULT CURRENT_TIMESTAMP, added ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-
-After pulling changes: run go mod tidy to download mysql driver and clean postgres deps.
-Icecast Global Password
-
-config.go now has IcecastSourcePassword field (env: ICECAST_SOURCE_PASSWORD)
-priest_service.go GetStreamStatus() still returns stream_key from DB — TODO: update to return global Icecast password instead, or handle in Priest PWA
-
+Note: ICECAST_SOURCE_PASSWORD removed — the Icecast global password is pre-configured on ST1 hardware by Svilen. The backend doesn't need it.
 Collaboration Notes
 
-Svilen handles server infrastructure (Hetzner VPS, Icecast, ST1 hardware/firmware)
+Svilen handles server infrastructure (Hetzner VPS, Icecast, ST1 hardware/firmware, av-control)
 Nicholas handles all software development (backend, PWAs, deployment)
-Svilen's server has MySQL pre-installed. PostgreSQL was originally planned but we adapted to MySQL to simplify deployment.
+Svilen's server has MySQL pre-installed
 ST1 is accessible remotely (not just LAN)
-Deployment responsibility: Nicholas (SSH access TBD)
 
 What's Done vs TODO
 ✅ Done
 
-Backend API: 30 endpoints, JWT+RBAC, all handlers/services
-Database schema: 10 tables, MySQL migration ready
-Priest PWA: Auth, dashboard, stream control, session history
+Backend API: JWT+RBAC, all handlers/services, ST1-driven architecture
+Database schema: 10 tables, MySQL migration ready + 002 ST1 migration
+Priest PWA: Auth, dashboard (read-only monitoring), session history
 User PWA: Auth, browse churches, subscribe, live audio player
 Mock ST1 server for local testing
 Documentation (architecture, API ref, DB, setup, deployment, ST1 integration)
+ST1-driven refactoring: device handler (serial lookup), priest handler (read-only), shared types/client cleanup
 
 🔲 TODO
-Priority: Icecast Global Password Adaptation
-Icecast uses a single global source password (r0j1e0A8bx) for ALL mounts. The current code still returns a per-church stream_key from the DB. This needs fixing:
 
-priest_service.go:
-
-Add IcecastSourcePassword string and IcecastBaseURL string fields to PriestService struct
-Update NewPriestService() to accept these two params
-In GetStreamStatus(): replace res["stream_key"] = church.StreamingCredential.StreamKey with res["icecast_source_password"] = s.IcecastSourcePassword and add res["icecast_url"] built from IcecastBaseURL + "/" + stream_id + ".mp3"
-
-
-main.go:
-
-Update NewPriestService(db) call to NewPriestService(db, cfg.IcecastBaseURL, cfg.IcecastSourcePassword)
-
-
-
-Other TODO
-
-Run go mod tidy after MySQL migration
-Run migration SQL on Hetzner MySQL
-Test backend startup with MySQL connection
 Admin PWA implementation
 Deploy backend to Hetzner
+Run 002 migration on production MySQL
 End-to-end test with real ST1 hardware
-Verify/obtain SSH credentials for Hetzner server
+Test tool simulating ST1 callbacks for dev without hardware
+Push notifications
+Recording management
+Active listener tracking (heartbeat)

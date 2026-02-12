@@ -137,7 +137,7 @@ Header richiesto: `Authorization: Bearer <admin_token>`
       "logo_url": "https://...",
       "streaming_active": false,
       "machine": { "id": 1, "machine_id": "SMIX-12345" },
-      "streaming_credential": { "stream_id": "streamab3xk9f2m7p4", "stream_key": "..." },
+      "streaming_credential": { "stream_id": "streamab3xk9f2m7p4" },
       "priests": [{ "id": 1, "name": "Don Mario" }]
     }
   ]
@@ -159,8 +159,7 @@ Crea la chiesa e auto-genera `streaming_credentials`.
 {
   "church": { ... },
   "streaming_credentials": {
-    "stream_id": "streamab3xk9f2m7p4",
-    "stream_key": "aB3xK9f2..."
+    "stream_id": "streamab3xk9f2m7p4"
   }
 }
 ```
@@ -220,17 +219,20 @@ Crea la chiesa e auto-genera `streaming_credentials`.
       "duration_seconds": 5400,
       "max_listener_count": 42,
       "church": { "name": "San Pietro" },
-      "priest": { "name": "Don Mario" }
+      "priest": null
     }
   ]
 }
 ```
+Nota: `priest` è `null` per sessioni avviate dall'hardware ST1.
 
 ---
 
-## Priest endpoints
+## Priest endpoints (read-only)
 
 Header richiesto: `Authorization: Bearer <priest_token>`
+
+Lo streaming è controllato dall'hardware ST1 tramite av-control. La Priest PWA è solo monitoring.
 
 #### GET `/priest/churches`
 ```json
@@ -241,7 +243,6 @@ Header richiesto: `Authorization: Bearer <priest_token>`
       "id": 1,
       "name": "Parrocchia San Pietro",
       "streaming_active": false,
-      "streaming_credential": { "stream_id": "streamab3xk9f2m7p4", "stream_key": "..." },
       "machine": { "machine_id": "SMIX-12345" }
     }
   ]
@@ -250,42 +251,19 @@ Header richiesto: `Authorization: Bearer <priest_token>`
 
 #### GET `/priest/churches/:id/stream/status`
 ```json
-// Response 200
+// Response 200 (stream attivo)
 {
   "church_id": 1,
   "church_name": "San Pietro",
   "streaming_active": true,
-  "stream_id": "streamab3xk9f2m7p4",
-  "stream_key": "aB3xK9f2...",
   "session": { "id": 5, "started_at": "2026-02-06T14:00:00Z" }
 }
-```
 
-#### POST `/priest/churches/:id/stream/start`
-```json
-// Response 200
+// Response 200 (stream inattivo)
 {
-  "message": "Stream session created",
-  "session": {
-    "id": 5,
-    "church_id": 1,
-    "started_by_priest_id": 1,
-    "started_at": "2026-02-06T14:00:00Z"
-  }
-}
-```
-Errori: `409` stream già attivo, `412` nessuna credential configurata
-
-#### POST `/priest/churches/:id/stream/stop`
-```json
-// Response 200
-{
-  "message": "Stream stopped",
-  "session": {
-    "id": 5,
-    "ended_at": "2026-02-06T15:30:00Z",
-    "duration_seconds": 5400
-  }
+  "church_id": 1,
+  "church_name": "San Pietro",
+  "streaming_active": false
 }
 ```
 
@@ -393,39 +371,57 @@ Errori: `403` non iscritto, `404` stream non trovato
 
 Header richiesto: `X-Device-Key: <device_api_key>`
 
+La ST1 identifica sé stessa tramite `serial_number` (corrisponde a `machine_id` nel DB).
+
 #### POST `/device/validate`
-ST1 chiama questo endpoint per verificare le credenziali prima di iniziare lo stream.
+ST1 chiama per ottenere la configurazione Icecast prima di iniziare lo stream.
 ```json
 // Request
-{ "stream_id": "streamab3xk9f2m7p4", "stream_key": "aB3xK9f2..." }
+{ "serial_number": "SMIX-12345" }
 
 // Response 200
-{ "valid": true, "church_id": 1, "stream_id": "streamab3xk9f2m7p4" }
+{
+  "valid": true,
+  "church_id": 1,
+  "stream_id": "streamab3xk9f2m7p4",
+  "icecast_url": "http://vdserv.com:8000",
+  "mount": "/streamab3xk9f2m7p4.mp3"
+}
 
-// Response 401
-{ "valid": false, "message": "Invalid stream credentials" }
+// Response 404
+{ "error": "Machine not found" }
 
 // Response 403
-{ "valid": false, "message": "Machine not activated" }
+{ "error": "Machine not activated" }
+
+// Response 404
+{ "error": "No church linked to this machine" }
 ```
 
 #### POST `/device/stream/started`
-ST1 notifica che lo stream è partito con successo.
+ST1 notifica che lo stream è partito. Il backend **crea la sessione** nel DB.
 ```json
 // Request
-{ "stream_id": "streamab3xk9f2m7p4" }
+{ "serial_number": "SMIX-12345" }
 
-// Response 200
-{ "success": true, "church_id": 1 }
+// Response 200 (nuova sessione)
+{ "success": true, "session_id": 5, "church_id": 1 }
+
+// Response 200 (idempotente — già in streaming)
+{ "success": true, "session_id": 5, "church_id": 1 }
 ```
 
 #### POST `/device/stream/stopped`
-ST1 notifica che lo stream si è fermato (stop manuale o connessione persa). Safety net per consistenza DB.
+ST1 notifica che lo stream si è fermato. Il backend **chiude la sessione** nel DB.
+Safety net per consistenza DB (stop manuale, connessione persa, riavvio ST1).
 ```json
 // Request
-{ "stream_id": "streamab3xk9f2m7p4" }
+{ "serial_number": "SMIX-12345" }
 
 // Response 200
+{ "success": true, "church_id": 1 }
+
+// Response 200 (idempotente — nessuno stream attivo)
 { "success": true, "church_id": 1 }
 ```
 
@@ -433,7 +429,7 @@ ST1 notifica che lo stream si è fermato (stop manuale o connessione persa). Saf
 
 ## ST1 Local endpoints (smixRest, porta 8080)
 
-Questi endpoint sono sul dispositivo ST1 locale, NON sul backend. La Priest PWA li chiama direttamente in rete locale.
+Questi endpoint sono sul dispositivo ST1 locale, NON sul backend. Sono chiamati da **av-control** (PWA locale sulla ST1), non dalla Priest PWA.
 
 #### POST `/api/device/st1/play`
 ```json

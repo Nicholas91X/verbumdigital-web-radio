@@ -5,7 +5,6 @@ import type { ApiError } from './types';
 // ============================================
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081/api/v1';
-const ST1_BASE_URL = import.meta.env.VITE_ST1_BASE_URL || 'http://localhost:8080';
 
 // ============================================
 // TOKEN MANAGEMENT
@@ -94,7 +93,6 @@ class ApiClient {
         return data as T;
     }
 
-    // Public (no auth)
     get<T>(path: string, requireAuth = true): Promise<T> {
         return this.request<T>('GET', path, undefined, requireAuth);
     }
@@ -113,39 +111,3 @@ class ApiClient {
 }
 
 export const api = new ApiClient(API_BASE_URL);
-
-// ============================================
-// ST1 CLIENT (Local device on LAN)
-// ============================================
-
-class ST1Client {
-    private baseURL: string;
-
-    constructor(baseURL: string) {
-        this.baseURL = baseURL;
-    }
-
-    private async request<T>(method: string, path: string, body?: object): Promise<T> {
-        const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-        };
-
-        const response = await fetch(`${this.baseURL}${path}`, {
-            method,
-            headers,
-            body: body ? JSON.stringify(body) : undefined,
-        });
-
-        return (await response.json()) as T;
-    }
-
-    get<T>(path: string): Promise<T> {
-        return this.request<T>('GET', path);
-    }
-
-    post<T>(path: string, body?: object): Promise<T> {
-        return this.request<T>('POST', path, body);
-    }
-}
-
-export const st1 = new ST1Client(ST1_BASE_URL);

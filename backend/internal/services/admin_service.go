@@ -174,7 +174,7 @@ func (s *AdminService) CreateChurch(name, address, logoURL string, machineID *in
 		cred = models.StreamingCredential{
 			ChurchID:  church.ID,
 			StreamID:  streamID,
-			StreamKey: streamKey,
+			StreamKey: &streamKey,
 		}
 
 		return tx.Create(&cred).Error

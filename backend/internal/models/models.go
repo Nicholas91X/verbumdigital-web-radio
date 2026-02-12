@@ -44,12 +44,15 @@ type Church struct {
 
 // ============================================
 // STREAMING CREDENTIALS
+// Identifies a church's Icecast mount point.
+// stream_key is no longer used — Icecast global source password
+// is pre-configured on ST1 hardware by Svilen.
 // ============================================
 type StreamingCredential struct {
 	ID        int       `gorm:"primaryKey" json:"id"`
 	ChurchID  int       `gorm:"uniqueIndex;not null" json:"church_id"`
 	StreamID  string    `gorm:"uniqueIndex;size:100;not null" json:"stream_id"`
-	StreamKey string    `gorm:"size:255;not null" json:"stream_key"`
+	StreamKey *string   `gorm:"size:255" json:"stream_key,omitempty"` // deprecated, nullable
 	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 
@@ -84,7 +87,6 @@ type PriestChurch struct {
 	Church *Church `gorm:"foreignKey:ChurchID" json:"church,omitempty"`
 }
 
-// ... (remaining models also updated to int)
 func (PriestChurch) TableName() string {
 	return "priest_churches"
 }
@@ -139,7 +141,7 @@ type Admin struct {
 type StreamingSession struct {
 	ID                int        `gorm:"primaryKey" json:"id"`
 	ChurchID          int        `gorm:"not null" json:"church_id"`
-	StartedByPriestID *int       `json:"started_by_priest_id,omitempty"`
+	StartedByPriestID *int       `json:"started_by_priest_id,omitempty"` // nil when started by ST1 hardware
 	StartedAt         time.Time  `gorm:"not null" json:"started_at"`
 	EndedAt           *time.Time `json:"ended_at,omitempty"`
 	DurationSeconds   *int       `json:"duration_seconds,omitempty"`

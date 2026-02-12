@@ -39,7 +39,7 @@ CREATE TABLE streaming_credentials (
     id INT AUTO_INCREMENT PRIMARY KEY,
     church_id INT UNIQUE,
     stream_id VARCHAR(100) UNIQUE NOT NULL, -- Encoded into Icecast URL
-    stream_key VARCHAR(255) NOT NULL,
+    stream_key VARCHAR(255), -- deprecated: Icecast global password is on ST1
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_credentials_church FOREIGN KEY (church_id) REFERENCES churches (id) ON DELETE CASCADE

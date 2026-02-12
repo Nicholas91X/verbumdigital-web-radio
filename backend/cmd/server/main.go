@@ -64,7 +64,7 @@ func main() {
 	priestHandler := handlers.NewPriestHandler(priestService)
 	userHandler := handlers.NewUserHandler(userService)
 	adminHandler := handlers.NewAdminHandler(adminService)
-	deviceHandler := handlers.NewDeviceHandler(db)
+	deviceHandler := handlers.NewDeviceHandler(db, cfg.IcecastBaseURL)
 
 	// =====================
 	// ROUTER
@@ -120,14 +120,12 @@ func main() {
 			admin.GET("/sessions", adminHandler.ListSessions)
 		}
 
-		// PRIEST
+		// PRIEST (read-only — stream control moved to ST1 hardware)
 		priest := v1.Group("/priest")
 		priest.Use(auth, middleware.RequireRole(middleware.RolePriest))
 		{
 			priest.GET("/churches", priestHandler.GetChurches)
 			priest.GET("/churches/:id/stream/status", priestHandler.GetStreamStatus)
-			priest.POST("/churches/:id/stream/start", priestHandler.StartStream)
-			priest.POST("/churches/:id/stream/stop", priestHandler.StopStream)
 			priest.GET("/churches/:id/sessions", priestHandler.GetSessions)
 		}
 

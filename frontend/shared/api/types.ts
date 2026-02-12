@@ -33,7 +33,6 @@ export interface StreamingCredential {
     id: number;
     church_id: number;
     stream_id: string;
-    stream_key: string;
     created_at: string;
     updated_at: string;
 }
@@ -130,17 +129,10 @@ export interface StreamStatus {
     church_id: number;
     church_name: string;
     streaming_active: boolean;
-    stream_id?: string;
-    stream_key?: string;
     session?: {
         id: number;
         started_at: string;
     };
-}
-
-export interface StreamActionResponse {
-    message: string;
-    session: StreamingSession;
 }
 
 export interface ChurchListResponse {
@@ -169,18 +161,5 @@ export interface StreamURLResponse {
     church_id: number;
     church_name: string;
     streaming_active: boolean;
-    stream_url: string;
-}
-
-// ============================================
-// ST1 LOCAL (smixRest on port 8080)
-// ============================================
-
-export interface ST1Status {
-    state: 'streaming' | 'stopped' | 'noid';
-    current_time: number;
-}
-
-export interface ST1Setup {
     stream_url: string;
 }
