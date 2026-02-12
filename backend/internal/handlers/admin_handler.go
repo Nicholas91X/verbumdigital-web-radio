@@ -33,21 +33,21 @@ type CreateChurchRequest struct {
 	Name      string `json:"name" binding:"required"`
 	Address   string `json:"address"`
 	LogoURL   string `json:"logo_url"`
-	MachineID *int   `json:"machine_id"`
+	MachineID *int32 `json:"machine_id"`
 }
 
 type UpdateChurchRequest struct {
 	Name      string `json:"name"`
 	Address   string `json:"address"`
 	LogoURL   string `json:"logo_url"`
-	MachineID *int   `json:"machine_id"`
+	MachineID *int32 `json:"machine_id"`
 }
 
 type CreatePriestRequest struct {
-	Name      string `json:"name" binding:"required"`
-	Email     string `json:"email" binding:"required,email"`
-	Password  string `json:"password" binding:"required,min=6"`
-	ChurchIDs []int  `json:"church_ids"`
+	Name      string  `json:"name" binding:"required"`
+	Email     string  `json:"email" binding:"required,email"`
+	Password  string  `json:"password" binding:"required,min=6"`
+	ChurchIDs []int32 `json:"church_ids"`
 }
 
 // ============================================
@@ -84,7 +84,7 @@ func (h *AdminHandler) CreateMachine(c *gin.Context) {
 }
 
 func (h *AdminHandler) UpdateMachine(c *gin.Context) {
-	id, err := parseIntParam(c, "id")
+	id, err := parseInt32Param(c, "id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
 		return
@@ -110,7 +110,7 @@ func (h *AdminHandler) UpdateMachine(c *gin.Context) {
 }
 
 func (h *AdminHandler) ActivateMachine(c *gin.Context) {
-	id, err := parseIntParam(c, "id")
+	id, err := parseInt32Param(c, "id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
 		return
@@ -126,7 +126,7 @@ func (h *AdminHandler) ActivateMachine(c *gin.Context) {
 }
 
 func (h *AdminHandler) DeactivateMachine(c *gin.Context) {
-	id, err := parseIntParam(c, "id")
+	id, err := parseInt32Param(c, "id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
 		return
@@ -174,7 +174,7 @@ func (h *AdminHandler) CreateChurch(c *gin.Context) {
 }
 
 func (h *AdminHandler) UpdateChurch(c *gin.Context) {
-	id, err := parseIntParam(c, "id")
+	id, err := parseInt32Param(c, "id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
 		return

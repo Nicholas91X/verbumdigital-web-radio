@@ -55,7 +55,7 @@ func (s *AdminService) CreateMachine(machineID string) (*models.Machine, error) 
 	return machine, nil
 }
 
-func (s *AdminService) UpdateMachine(id int, machineID string) (*models.Machine, error) {
+func (s *AdminService) UpdateMachine(id int32, machineID string) (*models.Machine, error) {
 	var machine models.Machine
 	if err := s.DB.First(&machine, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -80,7 +80,7 @@ func (s *AdminService) UpdateMachine(id int, machineID string) (*models.Machine,
 	return &machine, nil
 }
 
-func (s *AdminService) ActivateMachine(id int) (*models.Machine, error) {
+func (s *AdminService) ActivateMachine(id int32) (*models.Machine, error) {
 	var machine models.Machine
 	if err := s.DB.First(&machine, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -98,7 +98,7 @@ func (s *AdminService) ActivateMachine(id int) (*models.Machine, error) {
 	return &machine, nil
 }
 
-func (s *AdminService) DeactivateMachine(id int) (*models.Machine, error) {
+func (s *AdminService) DeactivateMachine(id int32) (*models.Machine, error) {
 	var machine models.Machine
 	if err := s.DB.First(&machine, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -131,7 +131,7 @@ func (s *AdminService) ListChurches() ([]models.Church, error) {
 	return churches, err
 }
 
-func (s *AdminService) CreateChurch(name, address, logoURL string, machineID *int) (*models.Church, *models.StreamingCredential, error) {
+func (s *AdminService) CreateChurch(name, address, logoURL string, machineID *int32) (*models.Church, *models.StreamingCredential, error) {
 	var church models.Church
 	var cred models.StreamingCredential
 
@@ -187,7 +187,7 @@ func (s *AdminService) CreateChurch(name, address, logoURL string, machineID *in
 	return &church, &cred, nil
 }
 
-func (s *AdminService) UpdateChurch(id int, name, address, logoURL string, machineID *int) (*models.Church, error) {
+func (s *AdminService) UpdateChurch(id int32, name, address, logoURL string, machineID *int32) (*models.Church, error) {
 	var church models.Church
 	if err := s.DB.First(&church, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -234,7 +234,7 @@ func (s *AdminService) ListPriests() ([]models.Priest, error) {
 	return priests, err
 }
 
-func (s *AdminService) CreatePriest(name, email, password string, churchIDs []int) (*models.Priest, error) {
+func (s *AdminService) CreatePriest(name, email, password string, churchIDs []int32) (*models.Priest, error) {
 	// Check email uniqueness
 	var count int64
 	s.DB.Model(&models.Priest{}).Where("email = ?", email).Count(&count)

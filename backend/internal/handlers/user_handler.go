@@ -42,7 +42,7 @@ func (h *UserHandler) GetChurches(c *gin.Context) {
 // ============================================
 
 func (h *UserHandler) GetChurch(c *gin.Context) {
-	churchID, err := parseIntParam(c, "id")
+	churchID, err := parseInt32Param(c, "id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid church ID"})
 		return
@@ -67,7 +67,7 @@ func (h *UserHandler) GetChurch(c *gin.Context) {
 
 func (h *UserHandler) Subscribe(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	churchID, err := parseIntParam(c, "id")
+	churchID, err := parseInt32Param(c, "id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid church ID"})
 		return
@@ -95,7 +95,7 @@ func (h *UserHandler) Subscribe(c *gin.Context) {
 
 func (h *UserHandler) Unsubscribe(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	churchID, err := parseIntParam(c, "id")
+	churchID, err := parseInt32Param(c, "id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid church ID"})
 		return
@@ -140,7 +140,7 @@ type NotificationUpdate struct {
 
 func (h *UserHandler) UpdateNotifications(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	churchID, err := parseIntParam(c, "id")
+	churchID, err := parseInt32Param(c, "id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid church ID"})
 		return
@@ -195,7 +195,7 @@ func (h *UserHandler) GetStreamURL(c *gin.Context) {
 
 func (h *UserHandler) GetChurchStream(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	churchID, err := parseIntParam(c, "id")
+	churchID, err := parseInt32Param(c, "id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid church ID"})
 		return

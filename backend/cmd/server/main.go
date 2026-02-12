@@ -27,8 +27,7 @@ func main() {
 
 	// Connect to database
 	db, err := gorm.Open(mysql.Open(cfg.DSN()), &gorm.Config{
-		Logger:                                   logger.Default.LogMode(logger.Info),
-		DisableForeignKeyConstraintWhenMigrating: true,
+		Logger: logger.Default.LogMode(logger.Info),
 	})
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
@@ -46,29 +45,22 @@ func main() {
 	log.Println("Database connected successfully")
 
 	// AutoMigrate models
-	// TODO: Fix MySQL 3780 incompatibility errors and re-enable AutoMigrate
-	/*
-		err = db.AutoMigrate(
-			&models.Machine{},
-			&models.Church{},
-			&models.StreamingCredential{},
-			&models.Priest{},
-			&models.PriestChurch{},
-			&models.User{},
-			&models.UserSubscription{},
-			&models.Admin{},
-			&models.StreamingSession{},
-			&models.ActiveListener{},
-			&models.PushSubscription{},
-		)
-		if err != nil {
-			log.Fatalf("Failed to auto-migrate: %v", err)
-		}
-		log.Println("Database migration completed successfully")
-	*/
-	log.Println("Skipping AutoMigrate due to MySQL 8.0 constraint issues")
-	_ = models.Machine{} // Prevent unused import error temporarily
-	log.Println("Database connection is active")
+	err = db.AutoMigrate(
+		&models.Machine{},
+		&models.Church{},
+		&models.StreamingCredential{},
+		&models.Priest{},
+		&models.PriestChurch{},
+		&models.User{},
+		&models.UserSubscription{},
+		&models.Admin{},
+		&models.StreamingSession{},
+		&models.ActiveListener{},
+		&models.PushSubscription{},
+	)
+	if err != nil {
+		log.Fatalf("Failed to auto-migrate: %v", err)
+	}
 	log.Println("Database migrated successfully")
 
 	// JWT config

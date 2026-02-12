@@ -15,7 +15,7 @@ func NewPriestService(db *gorm.DB) *PriestService {
 	return &PriestService{DB: db}
 }
 
-func (s *PriestService) GetChurches(priestID int) ([]models.Church, error) {
+func (s *PriestService) GetChurches(priestID int32) ([]models.Church, error) {
 	var priest models.Priest
 	if err := s.DB.
 		Preload("Churches").
@@ -28,7 +28,7 @@ func (s *PriestService) GetChurches(priestID int) ([]models.Church, error) {
 
 // GetStreamStatus returns read-only streaming status for a church.
 // No credentials are exposed — ST1 handles Icecast config directly.
-func (s *PriestService) GetStreamStatus(priestID, churchID int) (map[string]interface{}, error) {
+func (s *PriestService) GetStreamStatus(priestID, churchID int32) (map[string]interface{}, error) {
 	if !s.isPriestOfChurch(priestID, churchID) {
 		return nil, errors.New("church not found or access denied")
 	}
@@ -57,7 +57,7 @@ func (s *PriestService) GetStreamStatus(priestID, churchID int) (map[string]inte
 }
 
 // GetSessions returns session history for a church
-func (s *PriestService) GetSessions(priestID, churchID int, limit int) ([]models.StreamingSession, error) {
+func (s *PriestService) GetSessions(priestID, churchID int32, limit int) ([]models.StreamingSession, error) {
 	if !s.isPriestOfChurch(priestID, churchID) {
 		return nil, errors.New("church not found or access denied")
 	}
@@ -71,7 +71,7 @@ func (s *PriestService) GetSessions(priestID, churchID int, limit int) ([]models
 }
 
 // isPriestOfChurch checks if a priest has access to a church
-func (s *PriestService) isPriestOfChurch(priestID, churchID int) bool {
+func (s *PriestService) isPriestOfChurch(priestID, churchID int32) bool {
 	var count int64
 	s.DB.Table("priest_churches").Where("priest_id = ? AND church_id = ?", priestID, churchID).Count(&count)
 	return count > 0

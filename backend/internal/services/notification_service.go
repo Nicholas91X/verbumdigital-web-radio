@@ -27,7 +27,7 @@ func NewNotificationService(db *gorm.DB, pubKey, privKey, email string) *Notific
 }
 
 // SaveSubscription saves or updates a push subscription
-func (s *NotificationService) SaveSubscription(userID int, endpoint, p256dh, auth string) error {
+func (s *NotificationService) SaveSubscription(userID int32, endpoint, p256dh, auth string) error {
 	var sub models.PushSubscription
 	err := s.DB.Where("endpoint = ?", endpoint).First(&sub).Error
 
@@ -55,9 +55,9 @@ func (s *NotificationService) RemoveSubscriptionByEndpoint(endpoint string) erro
 }
 
 // NotifyChurchLive sends a push notification to all users subscribed to a church
-func (s *NotificationService) NotifyChurchLive(churchID int, churchName string) {
+func (s *NotificationService) NotifyChurchLive(churchID int32, churchName string) {
 	// 1. Find all users subscribed to this church with notifications enabled
-	var userIDs []int
+	var userIDs []int32
 	s.DB.Model(&models.UserSubscription{}).
 		Where("church_id = ? AND notifications_enabled = ?", churchID, true).
 		Pluck("user_id", &userIDs)

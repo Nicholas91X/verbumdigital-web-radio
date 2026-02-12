@@ -41,7 +41,7 @@ func (h *PriestHandler) GetChurches(c *gin.Context) {
 
 func (h *PriestHandler) GetStreamStatus(c *gin.Context) {
 	priestID := middleware.GetUserID(c)
-	churchID, err := parseIntParam(c, "id")
+	churchID, err := parseInt32Param(c, "id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid church ID"})
 		return
@@ -67,7 +67,7 @@ func (h *PriestHandler) GetStreamStatus(c *gin.Context) {
 
 func (h *PriestHandler) GetSessions(c *gin.Context) {
 	priestID := middleware.GetUserID(c)
-	churchID, err := parseIntParam(c, "id")
+	churchID, err := parseInt32Param(c, "id")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid church ID"})
 		return

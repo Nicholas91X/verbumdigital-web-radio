@@ -172,4 +172,5 @@ export interface StreamURLResponse {
     church_name: string;
     streaming_active: boolean;
     stream_url: string;
+    started_at?: string;
 }

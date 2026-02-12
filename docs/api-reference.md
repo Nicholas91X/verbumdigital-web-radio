@@ -44,9 +44,18 @@ Notify that streaming has ended.
 ## User API
 Endpoints for the User PWA. Auth via JWT.
 
-### GET /user/churches
-List all churches with live status.
-- **Response**: `{ "churches": [...] }`
+### GET /user/churches/:id/stream
+Get current stream URL and session info.
+- **Response**:
+  ```json
+  {
+    "church_id": 1,
+    "church_name": "San Pietro",
+    "streaming_active": true,
+    "stream_url": "http://vdserv.com:8000/san-pietro.mp3",
+    "started_at": "2024-05-20T10:00:00Z"
+  }
+  ```
 
 ### POST /user/churches/:id/subscribe
 Follow a church.

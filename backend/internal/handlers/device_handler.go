@@ -202,7 +202,7 @@ func (h *DeviceHandler) StreamStopped(c *gin.Context) {
 			var session models.StreamingSession
 			if err := tx.First(&session, *church.CurrentSessionID).Error; err == nil {
 				if session.EndedAt == nil {
-					durationSecs := int(now.Sub(session.StartedAt).Seconds())
+					durationSecs := int32(now.Sub(session.StartedAt).Seconds())
 					tx.Model(&session).Updates(map[string]interface{}{
 						"ended_at":         now,
 						"duration_seconds": durationSecs,

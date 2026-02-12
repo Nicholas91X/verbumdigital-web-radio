@@ -185,11 +185,25 @@ export default function ListenPage() {
     // ── Elapsed time counter ───────────────────────
     useEffect(() => {
         if (playerState !== 'playing') return;
-        const interval = setInterval(() => {
-            setElapsed((prev) => prev + 1);
-        }, 1000);
+
+        const updateElapsed = () => {
+            if (streamInfo?.started_at) {
+                const start = new Date(streamInfo.started_at).getTime();
+                const now = new Date().getTime();
+                setElapsed(Math.max(0, Math.floor((now - start) / 1000)));
+            } else {
+                setElapsed((prev) => prev + 1);
+            }
+        };
+
+        // Initial update
+        if (streamInfo?.started_at) {
+            updateElapsed();
+        }
+
+        const interval = setInterval(updateElapsed, 1000);
         return () => clearInterval(interval);
-    }, [playerState]);
+    }, [playerState, streamInfo?.started_at]);
 
     // ── Auto-detect when broadcast starts ──────────
     // When offline/waiting, poll to detect stream going live
