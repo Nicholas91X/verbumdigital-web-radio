@@ -1,197 +1,330 @@
-# Guida al Deployment su Hetzner
+# VerbumDigital — Production Deployment & Smoke Test Plan
 
-Questa guida illustra i passaggi per portare l'applicazione VerbumDigital in produzione su un server Linux (Ubuntu/Debian) di Hetzner.
+## Panoramica
 
-## 1. Prerequisiti
+Questo piano copre il deploy del backend aggiornato (ST1-driven + Push Notifications) su Hetzner e la strategia di verifica completa **senza hardware ST1**.
 
-*   **Server VPS**: Accesso SSH `root` al server.
-*   **Domini**: Domini puntati all'IP del server (es. `api.verbumdigital.com`, `admin.verbumdigital.com`, ecc.).
-*   **Docker & Docker Compose**: Installati sul server.
+---
 
-### Installazione Docker (se non presente)
+## Pre-Deploy Checklist
+
+### 1. Backup Database
+
 ```bash
-apt update && apt upgrade -y
-curl -fsSL https://get.docker.com -o get-docker.sh
-sh get-docker.sh
-apt install -y docker-compose-plugin
+# Dal server Hetzner (SSH porta 2200, user nicholas)
+ssh -p 2200 nicholas@vdserv.com
+
+# Dump completo
+mysqldump -u st1stream -p'4ifK(E)OrrQ-pi6y' st1 > /opt/verbumdigital/backups/st1_pre_deploy_$(date +%Y%m%d_%H%M%S).sql
 ```
 
-## 2. Preparazione Database (MySQL)
+> ⚠️ **Obbligatorio.** Il nuovo backend esegue `AutoMigrate` all'avvio che modifica lo schema (aggiunge tabella `push_subscriptions`, rende `stream_key` nullable). Se qualcosa va storto, questo dump è l'unica via di rollback.
 
-Su Hetzner, useremo Docker per gestire il database in modo semplice e isolato, simile all'ambiente locale.
+### 2. Generare VAPID Keys (una tantum)
 
-1.  **Crea una directory per il progetto**:
-    ```bash
-    mkdir -p /opt/verbumdigital/database
-    cd /opt/verbumdigital/database
-    ```
+Le Push Notifications richiedono una coppia di chiavi VAPID. Generarle **una sola volta** per la produzione:
 
-2.  **Crea `docker-compose.yml` per il DB**:
-    ```yaml
-    version: '3.8'
-    services:
-      mysql:
-        image: mysql:8.0
-        container_name: vd-mysql
-        restart: always
-        environment:
-          MYSQL_ROOT_PASSWORD: <PASSWORD_SICURA_DB>
-          MYSQL_DATABASE: st1stream
-          MYSQL_USER: st1stream
-          MYSQL_PASSWORD: <PASSWORD_SICURA_DB>
-        ports:
-          - "3306:3306"
-        volumes:
-          - mysqldata:/var/lib/mysql
-        command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
-    volumes:
-      mysqldata:
-        driver: local
-    ```
+```bash
+# In locale (richiede Node.js)
+npx web-push generate-vapid-keys
+```
 
-3.  **Avvia il database**:
-    ```bash
-    docker compose up -d
-    ```
+Output:
+```
+Public Key:  BLxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+Private Key: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
 
-4.  **Copia lo schema iniziale**:
-    Dalla tua macchina locale, copia il file SQL sul server:
-    ```bash
-    scp backend/migrations/001_initial_schema.sql root@<IP_HETZNER>:/opt/verbumdigital/database/
-    ```
+Annotare entrambe. La chiave pubblica va sia nel backend `.env` che nel frontend User PWA `.env.production`.
 
-5.  **Esegui la migrazione**:
-    Sul server:
-    ```bash
-    docker exec -i vd-mysql mysql -ust1stream -p<PASSWORD_SICURA_DB> st1stream < /opt/verbumdigital/database/001_initial_schema.sql
-    ```
+### 3. Certificato HTTPS
 
-## 3. Preparazione e Compilazione Backend (Go)
+Le Push Notifications **funzionano solo sotto HTTPS**. Verificare che Caddy sia attivo e che `api.verbumdigital.com` abbia un certificato SSL valido:
 
-Dobbiamo compilare l'eseguibile Go per l'architettura Linux del server (generalmente `amd64`).
+```bash
+curl -I https://api.verbumdigital.com
+# Deve restituire HTTP/2 200 (o 404 se il backend non è ancora attivo)
+```
 
-1.  **Compilazione Cross-Platform** (Locale):
-    Apri un terminale nella cartella `backend` del tuo progetto locale:
-    ```powershell
-    # Windows (PowerShell)
-    $Env:GOOS = "linux"
-    $Env:GOARCH = "amd64"
-    go build -o vd-server ./cmd/server
-    # (Dopo la compilazione, rimuovi le variabili d'ambiente se necessario o riavvia il terminale)
-    ```
+Se il dominio non è ancora configurato in Caddy, aggiungerlo al Caddyfile prima di procedere.
 
-2.  **Upload dei file**:
-    Crea la cartella app sul server: `mkdir -p /opt/verbumdigital/backend`.
-    Copia l'eseguibile e crea il file `.env`.
-    ```bash
-    scp backend/vd-server root@<IP_HETZNER>:/opt/verbumdigital/backend/
-    ```
+---
 
-3.  **Configurazione `.env` Produzione**:
-    Sul server, crea `/opt/verbumdigital/backend/.env`:
-    ```bash
-    nano /opt/verbumdigital/backend/.env
-    ```
-    Incolla e personalizza:
-    ```ini
-    PORT=8080
-    DB_HOST=localhost
-    DB_PORT=3306
-    DB_USER=st1stream
-    DB_PASSWORD=<PASSWORD_SICURA_DB_SCELTA_PRIMA>
-    DB_NAME=st1stream
-    
-    JWT_SECRET=<GENERA_UNA_STRINGA_LUNGA_E_CASUALE>
-    JWT_EXPIRATION_HOURS=720
-    
-    # URL Server Icecast (di produzione)
-    ICECAST_BASE_URL=http://<IP_O_DOMINIO_ICECAST>:8000
-    
-    DEVICE_API_KEY=<GENERA_UNA_CHIAVE_PER_ST1>
-    ```
+## Deploy Backend
 
-## 4. Configurazione Systemd (Service)
+### 4. Compilare il binario
 
-Per far girare il backend come servizio background che si riavvia automaticamente.
+In locale, nella cartella `backend/`:
 
-1.  **Crea il file di servizio**:
-    ```bash
-    nano /etc/systemd/system/verbumdigital.service
-    ```
+```powershell
+# Windows (PowerShell)
+$Env:GOOS = "linux"
+$Env:GOARCH = "amd64"
+go build -o vd-server ./cmd/server
 
-2.  **Contenuto**:
-    ```ini
-    [Unit]
-    Description=VerbumDigital Backend API
-    After=network.target docker.service
+# macOS/Linux
+GOOS=linux GOARCH=amd64 go build -o vd-server ./cmd/server
+```
 
-    [Service]
-    User=root
-    WorkingDirectory=/opt/verbumdigital/backend
-    ExecStart=/opt/verbumdigital/backend/vd-server
-    Restart=always
-    RestartSec=5
-    EnvironmentFile=/opt/verbumdigital/backend/.env
-    LimitNOFILE=10000
+### 5. Upload e configurazione
 
-    [Install]
-    WantedBy=multi-user.target
-    ```
+```bash
+# Upload binario
+scp -P 2200 backend/vd-server nicholas@vdserv.com:/opt/verbumdigital/backend/vd-server.new
 
-3.  **Attivazione**:
-    ```bash
-    systemctl daemon-reload
-    systemctl enable verbumdigital
-    systemctl start verbumdigital
-    systemctl status verbumdigital
-    ```
+# SSH sul server
+ssh -p 2200 nicholas@vdserv.com
+```
 
-## 5. Reverse Proxy & HTTPS (Caddy)
+### 6. Configurare `.env` produzione
 
-Caddy è consigliato per gestire automaticamente i certificati SSL.
+Editare `/opt/verbumdigital/backend/.env`:
 
-1.  **Installazione Caddy**:
-    (Segui le istruzioni ufficiali per la tua distro, su Ubuntu:)
-    ```bash
-    sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-    sudo apt update
-    sudo apt install caddy
-    ```
+```ini
+PORT=8081
 
-2.  **Configurazione `/etc/caddy/Caddyfile`**:
-    ```caddyfile
-    api.verbumdigital.com {
-        reverse_proxy localhost:8080
-    }
-    
-    # Se ospiti anche i frontend qui:
-    # app.verbumdigital.com {
-    #     root * /var/www/user_pwa
-    #     file_server
-    # }
-    ```
+# Database (MySQL locale su Hetzner)
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=st1stream
+DB_PASSWORD=4ifK(E)OrrQ-pi6y
+DB_NAME=st1
 
-3.  **Riavvia Caddy**:
-    ```bash
-    systemctl restart caddy
-    ```
+# JWT
+JWT_SECRET=<stringa_random_almeno_32_chars>
+JWT_EXPIRATION_HOURS=720
 
-## 6. Hosting Frontend (PWAs)
+# Icecast (solo URL base — la source password è sull'ST1)
+ICECAST_BASE_URL=http://vdserv.com:8000
 
-Per le PWA (React/Vite), devi fare la build locale e caricare i file statici (`dist`).
+# ST1 Device Authentication
+DEVICE_API_KEY=<chiave_segreta_per_st1>
 
-1.  **Build Locale**:
-    Nelle cartelle `frontend/admin`, `frontend/priest`, `frontend/user`:
-    Assicurati che `.env.production` abbia:
-    ```
-    VITE_API_BASE_URL=https://api.verbumdigital.com/api/v1
-    ```
-    Poi esegui:
-    ```bash
-    npm run build
-    ```
+# Push Notifications (VAPID — generati allo step 2)
+VAPID_PUBLIC_KEY=<chiave_pubblica_dal_passo_2>
+VAPID_PRIVATE_KEY=<chiave_privata_dal_passo_2>
+VAPID_EMAIL=admin@verbumdigital.com
+```
 
-2.  **Upload**:
-    Carica il contenuto delle cartelle `dist` sul server in `/var/www/` (es. `/var/www/admin`, `/var/www/user`, ecc.) e configura Caddy per servirle.
+> **Nota:** Non esiste `DB_DSN` — il backend compone il DSN MySQL internamente a partire dalle variabili `DB_*` separate.
+
+### 7. Swap e riavvio
+
+```bash
+cd /opt/verbumdigital/backend
+
+# Swap atomico
+sudo systemctl stop verbumdigital
+mv vd-server vd-server.old
+mv vd-server.new vd-server
+chmod +x vd-server
+sudo systemctl start verbumdigital
+
+# Verifica
+sudo systemctl status verbumdigital
+sudo journalctl -u verbumdigital -f --no-pager -n 50
+```
+
+Nei log dovresti vedere:
+```
+Database migrated successfully
+Server starting on :8081
+```
+
+Se ci sono errori, rollback immediato:
+```bash
+sudo systemctl stop verbumdigital
+mv vd-server vd-server.broken
+mv vd-server.old vd-server
+sudo systemctl start verbumdigital
+```
+
+---
+
+## Deploy Frontend User PWA
+
+### 8. Configurare `.env.production`
+
+In `frontend/user/.env.production`:
+
+```ini
+VITE_API_BASE_URL=https://api.verbumdigital.com/api/v1
+VITE_VAPID_PUBLIC_KEY=<stessa_chiave_pubblica_del_backend>
+```
+
+### 9. Build e upload
+
+```bash
+cd frontend/user
+npm run build
+
+# Upload dist
+scp -P 2200 -r dist/* nicholas@vdserv.com:/var/www/user/
+```
+
+Ripetere per `frontend/priest` e `frontend/admin` (senza VAPID, hanno solo `VITE_API_BASE_URL`).
+
+---
+
+## Smoke Test — Verifica Senza ST1
+
+Questo test simula l'intero ciclo di vita di una diretta usando solo `curl`, validando: risoluzione serial → sessione DB → push notification → UI real-time.
+
+### 10. Preparare i dati di test
+
+Dall'Admin PWA (`https://admin.verbumdigital.com`):
+
+1. Creare una **Macchina** con ID: `SMIX-PROD-TEST`
+2. **Attivare** la macchina
+3. Creare una **Chiesa di test** (es. "Test Push Notification") assegnata a questa macchina
+4. Verificare che la chiesa abbia streaming credentials create automaticamente
+
+### 11. Test Step 1 — Validate
+
+Verifica che il backend risolva correttamente serial → church:
+
+```bash
+curl -s -X POST https://api.verbumdigital.com/api/v1/device/validate \
+  -H "Content-Type: application/json" \
+  -H "X-Device-Key: <TUO_DEVICE_API_KEY>" \
+  -d '{"serial_number": "SMIX-PROD-TEST"}' | jq .
+```
+
+**Risposta attesa:**
+```json
+{
+  "valid": true,
+  "church_id": <N>,
+  "stream_id": "stream...",
+  "icecast_url": "http://vdserv.com:8000",
+  "mount": "/stream....mp3"
+}
+```
+
+> Se errore 404: la macchina non esiste o non è collegata a una chiesa.
+> Se errore 403: la macchina non è attivata.
+
+### 12. Test Step 2 — Iscrizione Push
+
+Prima di simulare la diretta, assicurati di avere un utente iscritto alla chiesa di test con notifiche abilitate:
+
+1. Apri la User PWA (`https://app.verbumdigital.com`) su smartphone/browser
+2. Login con un account utente
+3. Iscriviti alla chiesa "Test Push Notification"
+4. Accetta la richiesta di notifiche push del browser
+
+### 13. Test Step 3 — Stream Started
+
+Simula l'avvio della diretta:
+
+```bash
+curl -s -X POST https://api.verbumdigital.com/api/v1/device/stream/started \
+  -H "Content-Type: application/json" \
+  -H "X-Device-Key: <TUO_DEVICE_API_KEY>" \
+  -d '{"serial_number": "SMIX-PROD-TEST"}' | jq .
+```
+
+**Risposta attesa:**
+```json
+{
+  "success": true,
+  "church_id": <N>,
+  "session_id": <M>
+}
+```
+
+**Verifiche immediate:**
+- [ ] **Push notification** ricevuta su smartphone/browser ("Chiesa Test Push Notification è in diretta")
+- [ ] **User PWA**: la chiesa mostra stato **IN DIRETTA** con timer che scorre
+- [ ] **Priest PWA**: la chiesa mostra badge **LIVE** con durata
+- [ ] **Database**: `SELECT * FROM streaming_sessions ORDER BY id DESC LIMIT 1` mostra la sessione attiva con `started_by_priest_id = NULL`
+
+> **Nota:** Non ci sarà audio reale su Icecast (nessun encoder sta mandando dati). La UI mostrerà "in diretta" ma il player audio non riprodurrà nulla. Questo è normale per lo smoke test.
+
+### 14. Test Step 4 — Stream Stopped
+
+Chiudi la diretta simulata:
+
+```bash
+curl -s -X POST https://api.verbumdigital.com/api/v1/device/stream/stopped \
+  -H "Content-Type: application/json" \
+  -H "X-Device-Key: <TUO_DEVICE_API_KEY>" \
+  -d '{"serial_number": "SMIX-PROD-TEST"}' | jq .
+```
+
+**Verifiche:**
+- [ ] User PWA: la chiesa torna a stato **non in diretta** (entro 10-15 secondi, polling)
+- [ ] Priest PWA: badge torna a **STBY**
+- [ ] Database: la sessione ha `ended_at` e `duration_seconds` valorizzati
+
+### 15. Test Step 5 — Idempotenza
+
+Verifica che chiamate duplicate non causino problemi:
+
+```bash
+# Doppio started (deve restituire successo con "Stream already active")
+curl -s -X POST .../device/stream/started ... -d '{"serial_number": "SMIX-PROD-TEST"}' | jq .
+curl -s -X POST .../device/stream/started ... -d '{"serial_number": "SMIX-PROD-TEST"}' | jq .
+
+# Doppio stopped (deve restituire successo con "No active stream")
+curl -s -X POST .../device/stream/stopped ... -d '{"serial_number": "SMIX-PROD-TEST"}' | jq .
+curl -s -X POST .../device/stream/stopped ... -d '{"serial_number": "SMIX-PROD-TEST"}' | jq .
+```
+
+---
+
+## Checklist di Verifica Completa
+
+| # | Test | Risultato |
+|---|------|-----------|
+| 1 | Backend avviato senza errori | ☐ |
+| 2 | AutoMigrate completato (push_subscriptions creata) | ☐ |
+| 3 | `/device/validate` risolve serial → church | ☐ |
+| 4 | `/device/stream/started` crea sessione | ☐ |
+| 5 | Push notification ricevuta | ☐ |
+| 6 | User PWA mostra LIVE con timer | ☐ |
+| 7 | Priest PWA mostra LIVE | ☐ |
+| 8 | `/device/stream/stopped` chiude sessione | ☐ |
+| 9 | UI torna a stato non-live | ☐ |
+| 10 | Chiamate idempotenti funzionano | ☐ |
+
+---
+
+## Rollback Plan
+
+**Se il backend non parte (errore AutoMigrate o altro):**
+
+```bash
+# 1. Stoppa il backend
+sudo systemctl stop verbumdigital
+
+# 2. Ripristina il binario precedente
+mv vd-server vd-server.broken
+mv vd-server.old vd-server
+
+# 3. Ripristina il database (se AutoMigrate ha corrotto qualcosa)
+mysql -u st1stream -p'4ifK(E)OrrQ-pi6y' st1 < /opt/verbumdigital/backups/st1_pre_deploy_XXXXXXXX.sql
+
+# 4. Ripristina il vecchio .env (se modificato)
+cp .env.backup .env
+
+# 5. Riavvia
+sudo systemctl start verbumdigital
+sudo systemctl status verbumdigital
+```
+
+**Se le push notification non funzionano:**
+- Verificare che le VAPID keys siano identiche tra backend `.env` e frontend `.env.production`
+- Verificare HTTPS attivo (le push non funzionano su HTTP)
+- Controllare i log: `sudo journalctl -u verbumdigital | grep Push`
+- Il backend non si blocca se le push falliscono (invio asincrono con `go`)
+
+---
+
+## Post-Deploy
+
+Dopo aver completato lo smoke test con successo:
+
+1. **Rimuovere la macchina di test** (`SMIX-PROD-TEST`) dall'Admin PWA o lasciarla per test futuri
+2. **Aggiornare CLAUDE.md** — segnare Push Notifications come ✅ Done
+3. **Comunicare a Svilen** la `DEVICE_API_KEY` scelta, da configurare sulle ST1 reali
