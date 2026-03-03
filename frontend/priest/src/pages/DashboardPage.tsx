@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { api, st1 } from '@shared/api/client';
-import type { Church, StreamStatus, StreamActionResponse, ST1Status } from '@shared/api/types';
+import type { Church, StreamStatus, ST1Status } from '@shared/api/types';
 import { useAuth } from '@/context/AuthContext';
 
 export default function DashboardPage() {
@@ -65,7 +65,6 @@ export default function DashboardPage() {
                         <ChurchCard
                             key={church.id}
                             church={church}
-                            onStreamChange={fetchChurches}
                         />
                     ))}
                 </div>
@@ -80,10 +79,9 @@ export default function DashboardPage() {
 
 interface ChurchCardProps {
     church: Church;
-    onStreamChange: () => void;
 }
 
-function ChurchCard({ church, onStreamChange }: ChurchCardProps) {
+function ChurchCard({ church }: ChurchCardProps) {
     const [streamStatus, setStreamStatus] = useState<StreamStatus | null>(null);
     const [st1Status, setSt1Status] = useState<ST1Status | null>(null);
     const [st1Error, setSt1Error] = useState('');
