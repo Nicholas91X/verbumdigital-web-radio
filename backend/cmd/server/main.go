@@ -44,6 +44,9 @@ func main() {
 	}
 	log.Println("Database connected successfully")
 
+	// Disable FK constraints during migration (int32 ↔ bigint unsigned mismatch)
+	db.DisableForeignKeyConstraintWhenMigrating = true
+
 	// AutoMigrate models
 	err = db.AutoMigrate(
 		&models.Machine{},
@@ -98,6 +101,7 @@ func main() {
 			"http://localhost:3000", // Admin PWA (dev)
 			"http://localhost:3001", // Priest PWA (dev)
 			"http://localhost:3002", // User PWA (dev)
+			"https://app.verbumdigital.it",
 			// Production domains — add here when ready:
 			// "https://admin.verbumdigital.com",
 			// "https://priest.verbumdigital.com",

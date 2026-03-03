@@ -44,12 +44,11 @@ out/
 # PWA
 dev-dist/
 
-# Environment variables
+# Environment variables — NEVER commit secrets
+# Only .env.example files should be tracked
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
 
 # Logs
 logs

@@ -12,8 +12,8 @@ export default defineConfig({
         react() as PluginOption,
         VitePWA({
             strategies: 'injectManifest',
-            srcDir: 'src',
-            filename: '../src-sw.ts',
+            srcDir: '.',
+            filename: 'src-sw.ts',
             registerType: 'autoUpdate',
             injectRegister: 'auto',
             includeAssets: ['pwa-192x192.svg', 'pwa-512x512.svg'],
