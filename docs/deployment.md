@@ -70,26 +70,28 @@ The backend is a Go binary served behind Apache reverse proxy with SSL.
 
 ### Update & Redeploy
 
+**IMPORTANT**: The Hetzner server does not have the Go compiler installed, and the production process is managed by `verbumdigital.service`. You must cross-compile locally and upload via SCP.
+
 ```bash
-# SSH into Hetzner
-ssh nicholas@vdservice
+# 1. SSH into Hetzner and backup database FIRST
+ssh -p 2200 nicholas@195.201.138.249
+mysqldump --no-tablespaces -u st1stream -p'password' st1 > ~/backup_$(date +%Y%m%d_%H%M).sql
 
-# Backup database FIRST
-mysqldump -u st1stream -p st1stream > ~/backup_$(date +%Y%m%d_%H%M).sql
-
-# Pull latest code
-cd ~/verbumdigital-web-radio
-git pull origin main
-
-# Build new binary
+# 2. On your local machine (Windows PowerShell), cross-compile for Linux
 cd backend
-go build -o server cmd/server/main.go
+$env:GOOS='linux'; $env:GOARCH='amd64'; go build -o vd-server cmd/server/main.go
 
-# Update .env if needed (check for new variables)
-nano .env
+# 3. Upload the new binary to Hetzner
+scp -P 2200 vd-server nicholas@195.201.138.249:/tmp/vd-server-new
 
-# Restart service
-sudo systemctl restart vd-backend
+# 4. Back on Hetzner SSH, replace binary and restart the service
+cp /tmp/vd-server-new /opt/verbumdigital/backend/vd-server
+chmod +x /opt/verbumdigital/backend/vd-server
+sudo systemctl restart verbumdigital.service
+
+# 5. Verify it's running
+sudo systemctl status verbumdigital.service
+curl -I https://api.verbumdigital.it/health
 ```
 
 ### Adding CORS for new Vercel domains

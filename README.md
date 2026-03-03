@@ -96,13 +96,13 @@ cd frontend/user && npm install && npm run dev
 
 ## Stack Tecnologico
 
-| Layer | Tecnologia | Note |
-|:--|:--|:--|
-| Backend | Go 1.23 + Gin + GORM | REST API con JWT |
-| Database | MySQL 8.0 | 10 tabelle, schema in `backend/migrations/` |
-| Frontend | React + Vite + TypeScript | 3 PWA separate |
-| Streaming | Icecast | Server remoto su `vdserv.com:8000` |
-| Hardware | ST1 (smixRest) | Dispositivo audio → Icecast |
+| Layer     | Tecnologia                | Note                                                           |
+| :-------- | :------------------------ | :------------------------------------------------------------- |
+| Backend   | Go 1.23 + Gin + GORM      | REST API con JWT, Hostato su Hetzner (`verbumdigital.service`) |
+| Database  | MySQL 8.0                 | 10 tabelle (`int32` PKs), Hostato su Hetzner                   |
+| Frontend  | React + Vite + TypeScript | 3 PWA su Vercel (`app`, `admin`, `priest` `.verbumdigital.it`) |
+| Streaming | Icecast                   | Server remoto su `vdserv.com:8000`                             |
+| Hardware  | ST1 (smixRest)            | Dispositivo audio → Icecast                                    |
 
 ## Struttura del Progetto
 
@@ -164,74 +164,82 @@ sequenceDiagram
 ## API Endpoints
 
 ### Autenticazione (pubblica)
-| Metodo | Path | Descrizione |
-|:--|:--|:--|
-| POST | `/api/v1/auth/admin/login` | Login admin |
-| POST | `/api/v1/auth/priest/login` | Login sacerdote |
-| POST | `/api/v1/auth/user/login` | Login fedele |
-| POST | `/api/v1/auth/user/register` | Registrazione fedele |
+
+| Metodo | Path                         | Descrizione          |
+| :----- | :--------------------------- | :------------------- |
+| POST   | `/api/v1/auth/admin/login`   | Login admin          |
+| POST   | `/api/v1/auth/priest/login`  | Login sacerdote      |
+| POST   | `/api/v1/auth/user/login`    | Login fedele         |
+| POST   | `/api/v1/auth/user/register` | Registrazione fedele |
 
 ### Admin (richiede JWT + ruolo `admin`)
-| Metodo | Path | Descrizione |
-|:--|:--|:--|
-| GET | `/api/v1/admin/machines` | Lista macchine |
-| POST | `/api/v1/admin/machines` | Crea macchina |
-| PUT | `/api/v1/admin/machines/:id/activate` | Attiva macchina |
-| GET | `/api/v1/admin/churches` | Lista chiese |
-| POST | `/api/v1/admin/churches` | Crea chiesa |
-| GET | `/api/v1/admin/priests` | Lista sacerdoti |
-| POST | `/api/v1/admin/priests` | Crea sacerdote |
-| GET | `/api/v1/admin/sessions` | Storico sessioni |
+
+| Metodo | Path                                  | Descrizione      |
+| :----- | :------------------------------------ | :--------------- |
+| GET    | `/api/v1/admin/machines`              | Lista macchine   |
+| POST   | `/api/v1/admin/machines`              | Crea macchina    |
+| PUT    | `/api/v1/admin/machines/:id/activate` | Attiva macchina  |
+| GET    | `/api/v1/admin/churches`              | Lista chiese     |
+| POST   | `/api/v1/admin/churches`              | Crea chiesa      |
+| GET    | `/api/v1/admin/priests`               | Lista sacerdoti  |
+| POST   | `/api/v1/admin/priests`               | Crea sacerdote   |
+| GET    | `/api/v1/admin/sessions`              | Storico sessioni |
 
 ### Priest (richiede JWT + ruolo `priest`)
-| Metodo | Path | Descrizione |
-|:--|:--|:--|
-| GET | `/api/v1/priest/churches` | Le mie chiese |
-| GET | `/api/v1/priest/churches/:id/stream/status` | Stato stream |
-| POST | `/api/v1/priest/churches/:id/stream/start` | Avvia stream |
-| POST | `/api/v1/priest/churches/:id/stream/stop` | Ferma stream |
-| GET | `/api/v1/priest/churches/:id/sessions` | Storico sessioni |
+
+| Metodo | Path                                        | Descrizione      |
+| :----- | :------------------------------------------ | :--------------- |
+| GET    | `/api/v1/priest/churches`                   | Le mie chiese    |
+| GET    | `/api/v1/priest/churches/:id/stream/status` | Stato stream     |
+| POST   | `/api/v1/priest/churches/:id/stream/start`  | Avvia stream     |
+| POST   | `/api/v1/priest/churches/:id/stream/stop`   | Ferma stream     |
+| GET    | `/api/v1/priest/churches/:id/sessions`      | Storico sessioni |
 
 ### User (richiede JWT + ruolo `user`)
-| Metodo | Path | Descrizione |
-|:--|:--|:--|
-| GET | `/api/v1/user/churches` | Chiese disponibili |
-| POST | `/api/v1/user/churches/:id/subscribe` | Iscriviti |
-| DELETE | `/api/v1/user/churches/:id/subscribe` | Disiscriviti |
-| GET | `/api/v1/user/subscriptions` | Le mie iscrizioni |
-| GET | `/api/v1/user/churches/:id/stream` | URL stream attivo |
+
+| Metodo | Path                                  | Descrizione        |
+| :----- | :------------------------------------ | :----------------- |
+| GET    | `/api/v1/user/churches`               | Chiese disponibili |
+| POST   | `/api/v1/user/churches/:id/subscribe` | Iscriviti          |
+| DELETE | `/api/v1/user/churches/:id/subscribe` | Disiscriviti       |
+| GET    | `/api/v1/user/subscriptions`          | Le mie iscrizioni  |
+| GET    | `/api/v1/user/churches/:id/stream`    | URL stream attivo  |
 
 ### Device (richiede `X-Device-Key` header)
-| Metodo | Path | Descrizione |
-|:--|:--|:--|
-| POST | `/api/v1/device/validate` | Valida credenziali stream |
-| POST | `/api/v1/device/stream/started` | Notifica stream avviato |
-| POST | `/api/v1/device/stream/stopped` | Notifica stream terminato |
+
+| Metodo | Path                            | Descrizione               |
+| :----- | :------------------------------ | :------------------------ |
+| POST   | `/api/v1/device/validate`       | Valida credenziali stream |
+| POST   | `/api/v1/device/stream/started` | Notifica stream avviato   |
+| POST   | `/api/v1/device/stream/stopped` | Notifica stream terminato |
 
 ## Stato Attuale (Febbraio 2026)
 
 ### ✅ Completato
+
 - Schema database MySQL (10 tabelle + indici)
-- Backend Go completo: auth JWT, CRUD admin, streaming priest, sottoscrizioni user
+- Backend Go completo: auth JWT, CRUD admin, streaming priest, sottoscrizioni user e Push Notifications (VAPID)
 - Middleware: CORS, JWT auth, role-based access, device auth
 - 3 PWA frontend (Admin, Priest, User) con Vite + React + TypeScript
 - API client condiviso con supporto backend + ST1 locale
 - Mock ST1 per test locali (`tools/mock-st1.js`)
 - Docker Compose per setup database rapido
 - Compatibilità confermata con smixRest di Svilen (API ST1)
+- Deploy backend su Hetzner (Cross-compiled Go bin su `verbumdigital.service`)
+- Deploy Frontend su Vercel (Monorepo setup: 3 progetti separati)
+- Configurazione domini produzione (CORS + HTTPS su Vercel e Hetzner apache proxy)
 
 ### 🔜 Da fare
-- Deploy backend su Hetzner (`78.83.222.98` / `vdserv.com`)
-- Test end-to-end con dispositivo ST1 fisico
-- Configurazione domini produzione (CORS + HTTPS)
+
+- Test end-to-end con dispositivo ST1 fisico reale (fatto in simulazione API)
 - Test streaming reale via Icecast
 - Configurazione mount points Icecast con Svilen
-- CI/CD pipeline
+- CI/CD pipeline automatica
 
 ## Credenziali di Test (solo locale)
 
-| Ruolo | Email | Password |
-|:--|:--|:--|
+| Ruolo | Email                     | Password   |
+| :---- | :------------------------ | :--------- |
 | Admin | `admin@verbumdigital.com` | `admin123` |
 
 Sacerdoti e utenti vanno creati dall'admin dopo l'avvio.
