@@ -98,14 +98,14 @@ func main() {
 	// CORS — allow PWA origins (dev + production)
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{
+			// Development
 			"http://localhost:3000", // Admin PWA (dev)
 			"http://localhost:3001", // Priest PWA (dev)
 			"http://localhost:3002", // User PWA (dev)
+			// Production (Vercel → custom domains)
 			"https://app.verbumdigital.it",
-			// Production domains — add here when ready:
-			// "https://admin.verbumdigital.com",
-			// "https://priest.verbumdigital.com",
-			// "https://app.verbumdigital.com",
+			"https://admin.verbumdigital.it",
+			"https://priest.verbumdigital.it",
 		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Device-Key"},
