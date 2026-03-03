@@ -29,15 +29,12 @@ export default function PriestsPage() {
     }, [fetchData]);
 
     return (
-        <div className="p-6 space-y-6">
+        <div className="p-4 sm:p-6 space-y-6 pb-24">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold">Sacerdoti</h1>
+                    <h1 className="text-2xl font-bold text-white">Sacerdoti</h1>
                     <p className="text-surface-400 text-sm mt-0.5">Gestione account sacerdoti e assegnazioni</p>
                 </div>
-                <button onClick={() => setShowCreate(true)} className="btn-primary">
-                    + Nuovo Sacerdote
-                </button>
             </div>
 
             {loading ? (
@@ -45,43 +42,54 @@ export default function PriestsPage() {
             ) : priests.length === 0 ? (
                 <EmptyState message="Nessun sacerdote registrato" />
             ) : (
-                <div className="card overflow-hidden p-0">
-                    <table className="w-full">
-                        <thead className="bg-surface-900/50">
-                            <tr>
-                                <th className="table-header">Nome</th>
-                                <th className="table-header">Email</th>
-                                <th className="table-header">Chiese assegnate</th>
-                                <th className="table-header">Registrato</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-surface-700">
-                            {priests.map((p) => (
-                                <tr key={p.id}>
-                                    <td className="table-cell font-medium">{p.name}</td>
-                                    <td className="table-cell text-surface-400">{p.email}</td>
-                                    <td className="table-cell">
-                                        {p.churches && p.churches.length > 0 ? (
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {p.churches.map((pc) => (
-                                                    <span key={pc.church_id} className="badge bg-primary-500/15 text-primary-400">
-                                                        {pc.church?.name ?? `Chiesa #${pc.church_id}`}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <span className="text-surface-500">Nessuna</span>
-                                        )}
-                                    </td>
-                                    <td className="table-cell text-surface-500 text-xs">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {priests.map((p) => (
+                        <div key={p.id} className="card-glass flex flex-col justify-between p-5 relative overflow-hidden group">
+                            <div>
+                                <div className="flex justify-between items-start mb-4 relative z-10">
+                                    <div>
+                                        <h3 className="font-bold text-lg text-white leading-tight flex items-center gap-2">
+                                            {p.name}
+                                        </h3>
+                                        <p className="text-xs text-surface-400 mt-1">{p.email}</p>
+                                    </div>
+                                    <span className="text-xs text-surface-500 font-mono">
                                         {new Date(p.created_at).toLocaleDateString('it-IT')}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                                    </span>
+                                </div>
+
+                                <div className="space-y-2 text-sm relative z-10 border-t border-surface-700/50 pt-3 mt-3">
+                                    <p className="text-xs text-surface-500 mb-2 uppercase tracking-wider font-semibold">
+                                        Chiese assegnate
+                                    </p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {p.churches && p.churches.length > 0 ? (
+                                            p.churches.map((pc) => (
+                                                <span key={pc.church_id} className="text-xs bg-primary-500/15 text-primary-400 px-2 py-0.5 rounded-md border border-primary-500/20 shadow-sm">
+                                                    {pc.church?.name ?? `Chiesa #${pc.church_id}`}
+                                                </span>
+                                            ))
+                                        ) : (
+                                            <span className="text-xs text-surface-500 italic">Nessuna assegnazione</span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             )}
+
+            {/* Floating Action Button for Mobile */}
+            <button
+                onClick={() => setShowCreate(true)}
+                className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-full flex items-center justify-center shadow-[0_8px_30px_rgba(99,102,241,0.5)] hover:scale-105 active:scale-95 transition-all z-40 border border-primary-400/30"
+                aria-label="Nuovo Sacerdote"
+            >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+            </button>
 
             <CreatePriestModal
                 open={showCreate}
