@@ -363,99 +363,103 @@ export default function ListenPage() {
         preload="none"
       />
 
-      {/* Back button */}
-      <button
-        onClick={() => navigate(-1)}
-        className="absolute top-6 left-6 text-surface-400 hover:text-white transition-colors flex items-center gap-1.5 z-20 pt-safe"
-      >
-        <div className="w-8 h-8 rounded-full bg-surface-900 border border-surface-800 flex items-center justify-center">
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2.5}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-        </div>
-        <span className="font-semibold text-xs tracking-wide uppercase">
-          Indietro
-        </span>
-      </button>
+      {/* Header section with back button and title */}
+      <div className="w-full max-w-lg mx-auto flex items-center gap-4 mb-12 z-10 pt-safe">
+        <button
+          onClick={() => navigate(-1)}
+          className="shrink-0 flex items-center gap-1.5 text-surface-400 hover:text-white transition-colors p-2 -ml-2 active:scale-95"
+        >
+          <div className="w-10 h-10 rounded-full bg-surface-900 border border-surface-800 flex items-center justify-center shadow-lg">
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
+          </div>
+          <span className="font-bold text-[10px] tracking-widest uppercase hidden sm:inline">
+            Indietro
+          </span>
+        </button>
 
-      {/* Church name */}
-      <div className="text-center mb-12 z-20 w-full px-4">
-        <h1 className="text-3xl font-extrabold tracking-tight mb-3 truncate">
-          {streamInfo?.church_name || "Caricamento..."}
-        </h1>
-        <div className="flex flex-col items-center gap-2">
-          {(playerState === "playing" ||
-            playerState === "buffering" ||
-            playerState === "paused") &&
-            (isLive ? (
-              <div className="px-3 py-1 bg-red-500/10 border border-red-500/20 rounded-full flex items-center gap-2">
-                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
-                <span className="text-red-500 text-[10px] font-bold uppercase tracking-widest leading-none">
-                  In Diretta
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl font-black tracking-tight truncate py-1">
+            {streamInfo?.church_name || "Caricamento..."}
+          </h1>
+          <div className="flex flex-wrap items-center gap-2 mt-1">
+            {/* Live/Differita Badge */}
+            {(playerState === "playing" ||
+              playerState === "buffering" ||
+              playerState === "paused") &&
+              (isLive ? (
+                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-red-500/10 border border-red-500/20 rounded-full">
+                  <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
+                  <span className="text-red-500 text-[9px] font-black uppercase tracking-widest leading-none">
+                    Diretta
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded-full">
+                  <span className="w-1.5 h-1.5 bg-amber-500 rounded-full shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
+                  <span className="text-amber-500 text-[9px] font-black uppercase tracking-widest leading-none">
+                    Differita
+                  </span>
+                </div>
+              ))}
+
+            {/* Status indicators */}
+            {playerState === "buffering" && (
+              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded-full">
+                <svg
+                  className="w-2.5 h-2.5 text-amber-500 animate-spin"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    fill="none"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
+                </svg>
+                <span className="text-amber-500 text-[9px] font-black uppercase tracking-widest leading-none">
+                  {retryIn > 0 ? `Retry in ${retryIn}s` : "Connessione..."}
                 </span>
               </div>
-            ) : (
-              <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full flex items-center gap-2">
-                <span className="w-2 h-2 bg-amber-500 rounded-full shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
-                <span className="text-amber-500 text-[10px] font-bold uppercase tracking-widest leading-none">
-                  In Ritardo
+            )}
+
+            {playerState === "offline" && (
+              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-surface-800 border border-surface-700 rounded-full">
+                <span className="w-1.5 h-1.5 bg-surface-600 rounded-full" />
+                <span className="text-surface-400 text-[9px] font-black uppercase tracking-widest leading-none">
+                  Terminata
                 </span>
               </div>
-            ))}
-          {playerState === "buffering" && (
-            <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full flex items-center gap-2">
-              <svg
-                className="w-3 h-3 text-amber-500 animate-spin"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                  fill="none"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                />
-              </svg>
-              <span className="text-amber-500 text-[10px] font-bold uppercase tracking-widest leading-none">
-                {retryIn > 0
-                  ? `Riconnessione in ${retryIn}s...`
-                  : "Connessione..."}
-              </span>
-            </div>
-          )}
-          {playerState === "offline" && (
-            <div className="px-3 py-1 bg-surface-800 border border-surface-700 rounded-full flex items-center gap-2">
-              <span className="w-2 h-2 bg-surface-600 rounded-full" />
-              <span className="text-surface-400 text-[10px] font-bold uppercase tracking-widest leading-none">
-                Diretta terminata
-              </span>
-            </div>
-          )}
-          {playerState === "waiting" && (
-            <div className="px-3 py-1 bg-amber-500/5 border border-amber-500/20 rounded-full flex items-center gap-2">
-              <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
-              <span className="text-amber-500/80 text-[10px] font-bold uppercase tracking-widest leading-none">
-                In attesa della diretta...
-              </span>
-            </div>
-          )}
+            )}
+
+            {playerState === "waiting" && (
+              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-500/5 border border-amber-500/20 rounded-full">
+                <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
+                <span className="text-amber-500/80 text-[9px] font-black uppercase tracking-widest leading-none">
+                  In attesa...
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

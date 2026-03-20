@@ -244,7 +244,7 @@ function SubscriptionCard({
 
       {/* Info */}
       <div className="flex-1 min-w-0 py-1">
-        <p className="font-bold text-lg leading-tight truncate pr-10">
+        <p className="font-bold text-lg leading-tight pr-10">
           {sub.church_name}
         </p>
         {sub.streaming_active ? (
