@@ -1,35 +1,34 @@
 -- Migration: 001_initial_schema.sql
--- VerbumDigital Web Radio - Initial Database Schema
+-- VerbumDigital Web Radio - Initial Database Schema (MySQL)
 -- Based on agreed schema with Svilen (Feb 2026)
-
-BEGIN;
 
 -- ============================================
 -- HARDWARE
 -- ============================================
 CREATE TABLE machines (
-    id SERIAL PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     machine_id VARCHAR(50) UNIQUE NOT NULL, -- es: "SMIX-12345"
-    activated BOOLEAN DEFAULT false,
+    activated TINYINT(1) DEFAULT 0,
     activation_code VARCHAR(20),
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- ============================================
 -- CHURCHES
 -- ============================================
 CREATE TABLE churches (
-    id SERIAL PRIMARY KEY,
-    machine_id INTEGER UNIQUE REFERENCES machines (id),
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    machine_id INT UNIQUE,
     name VARCHAR(200) NOT NULL,
     logo_url VARCHAR(500),
     address TEXT,
-    streaming_active BOOLEAN DEFAULT false, -- Real-time status
-    current_session_id INTEGER, -- Populated later via FK
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
+    streaming_active TINYINT(1) DEFAULT 0, -- Real-time status
+    current_session_id INT, -- Populated later via FK
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_churches_machine FOREIGN KEY (machine_id) REFERENCES machines (id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- ============================================
 -- STREAMING CREDENTIALS (per church, permanent)
@@ -37,88 +36,95 @@ CREATE TABLE churches (
 -- Used by ST1 to identify the stream on Icecast
 -- ============================================
 CREATE TABLE streaming_credentials (
-    id SERIAL PRIMARY KEY,
-    church_id INTEGER UNIQUE REFERENCES churches (id) ON DELETE CASCADE,
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    church_id INT UNIQUE,
     stream_id VARCHAR(100) UNIQUE NOT NULL, -- Encoded into Icecast URL
-    stream_key VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
+    stream_key VARCHAR(255), -- deprecated: Icecast global password is on ST1
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_credentials_church FOREIGN KEY (church_id) REFERENCES churches (id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- ============================================
 -- PRIESTS (can manage multiple churches)
 -- ============================================
 CREATE TABLE priests (
-    id SERIAL PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(200) NOT NULL,
     email VARCHAR(200) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- ============================================
 -- PRIEST-CHURCH RELATIONSHIP (N:N)
 -- ============================================
 CREATE TABLE priest_churches (
-    id SERIAL PRIMARY KEY,
-    priest_id INTEGER REFERENCES priests (id) ON DELETE CASCADE,
-    church_id INTEGER REFERENCES churches (id) ON DELETE CASCADE,
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    priest_id INT,
+    church_id INT,
     role VARCHAR(20) DEFAULT 'owner', -- 'owner' or 'assistant'
-    created_at TIMESTAMP DEFAULT NOW(),
-    UNIQUE (priest_id, church_id)
-);
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_priest_church (priest_id, church_id),
+    CONSTRAINT fk_pc_priest FOREIGN KEY (priest_id) REFERENCES priests (id) ON DELETE CASCADE,
+    CONSTRAINT fk_pc_church FOREIGN KEY (church_id) REFERENCES churches (id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- ============================================
 -- USERS (fedeli)
 -- ============================================
 CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(200) NOT NULL,
     email VARCHAR(200) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- ============================================
 -- USER SUBSCRIPTIONS (with notification prefs)
 -- ============================================
 CREATE TABLE user_subscriptions (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users (id) ON DELETE CASCADE,
-    church_id INTEGER REFERENCES churches (id) ON DELETE CASCADE,
-    notifications_enabled BOOLEAN DEFAULT true,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW(),
-    UNIQUE (user_id, church_id)
-);
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    church_id INT,
+    notifications_enabled TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_user_church (user_id, church_id),
+    CONSTRAINT fk_sub_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_sub_church FOREIGN KEY (church_id) REFERENCES churches (id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- ============================================
 -- ADMINS (internal use)
 -- ============================================
 CREATE TABLE admins (
-    id SERIAL PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(100) UNIQUE NOT NULL,
     email VARCHAR(200) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW()
-);
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- ============================================
 -- STREAMING SESSIONS (with statistics)
 -- ============================================
 CREATE TABLE streaming_sessions (
-    id SERIAL PRIMARY KEY,
-    church_id INTEGER REFERENCES churches (id),
-    started_by_priest_id INTEGER REFERENCES priests (id),
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    church_id INT,
+    started_by_priest_id INT,
     started_at TIMESTAMP NOT NULL,
-    ended_at TIMESTAMP,
-    duration_seconds INTEGER,
+    ended_at TIMESTAMP NULL,
+    duration_seconds INT,
     recording_url VARCHAR(500),
-    max_listener_count INTEGER DEFAULT 0,
-    created_at TIMESTAMP DEFAULT NOW()
-);
+    max_listener_count INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_session_church FOREIGN KEY (church_id) REFERENCES churches (id),
+    CONSTRAINT fk_session_priest FOREIGN KEY (started_by_priest_id) REFERENCES priests (id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- Add FK from churches.current_session_id to streaming_sessions
 ALTER TABLE churches
@@ -129,12 +135,14 @@ ADD CONSTRAINT fk_churches_current_session FOREIGN KEY (current_session_id) REFE
 -- Tracked via User PWA connections (as agreed with Svilen)
 -- ============================================
 CREATE TABLE active_listeners (
-    id SERIAL PRIMARY KEY,
-    session_id INTEGER REFERENCES streaming_sessions (id) ON DELETE CASCADE,
-    user_id INTEGER REFERENCES users (id),
-    connected_at TIMESTAMP DEFAULT NOW(),
-    last_heartbeat TIMESTAMP DEFAULT NOW()
-);
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    session_id INT,
+    user_id INT,
+    connected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_heartbeat TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_listener_session FOREIGN KEY (session_id) REFERENCES streaming_sessions (id) ON DELETE CASCADE,
+    CONSTRAINT fk_listener_user FOREIGN KEY (user_id) REFERENCES users (id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- ============================================
 -- INDEXES for common queries
@@ -158,5 +166,3 @@ CREATE INDEX idx_streaming_sessions_church_id ON streaming_sessions (church_id);
 CREATE INDEX idx_active_listeners_session_id ON active_listeners (session_id);
 
 CREATE INDEX idx_active_listeners_last_heartbeat ON active_listeners (last_heartbeat);
-
-COMMIT;

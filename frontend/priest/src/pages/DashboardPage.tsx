@@ -1,201 +1,263 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
-import { api, st1 } from '@shared/api/client';
-import type { Church, StreamStatus, ST1Status } from '@shared/api/types';
-import { useAuth } from '@/context/AuthContext';
+import { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
+import { api } from "@shared/api/client";
+import type { Church, StreamStatus } from "@shared/api/types";
+import { useAuth } from "@/context/AuthContext";
 
 export default function DashboardPage() {
-    const { user } = useAuth();
-    const [churches, setChurches] = useState<Church[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+  const { user } = useAuth();
+  const [churches, setChurches] = useState<Church[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-    const fetchChurches = useCallback(async () => {
-        try {
-            const data = await api.get<{ churches: Church[] }>('/priest/churches');
-            setChurches(data.churches || []);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Errore caricamento');
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        fetchChurches();
-    }, [fetchChurches]);
-
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center py-20">
-                <svg className="animate-spin h-8 w-8 text-primary-500" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-            </div>
-        );
+  const fetchChurches = useCallback(async () => {
+    try {
+      const data = await api.get<{ churches: Church[] }>("/priest/churches");
+      setChurches(data.churches || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Errore caricamento");
+    } finally {
+      setLoading(false);
     }
+  }, []);
 
-    if (error) {
-        return (
-            <div className="px-4 py-8">
-                <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-red-400">
-                    {error}
-                </div>
-            </div>
-        );
-    }
+  useEffect(() => {
+    fetchChurches();
+    // Poll every 15s for live status updates
+    const interval = setInterval(fetchChurches, 15000);
+    return () => clearInterval(interval);
+  }, [fetchChurches]);
 
+  if (loading) {
     return (
-        <div className="px-4 py-6 space-y-6">
-            {/* Header */}
-            <div>
-                <h1 className="text-xl font-bold">Ciao, {user?.name || 'Padre'}</h1>
-                <p className="text-surface-400 text-sm mt-0.5">Le tue chiese</p>
-            </div>
-
-            {/* Church list */}
-            {churches.length === 0 ? (
-                <div className="card text-center text-surface-400 py-12">
-                    Nessuna chiesa assegnata
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    {churches.map((church) => (
-                        <ChurchCard
-                            key={church.id}
-                            church={church}
-                        />
-                    ))}
-                </div>
-            )}
+      <div className="flex items-center justify-center py-20">
+        <div className="relative">
+          <div className="w-12 h-12 rounded-full absolute border-4 border-solid border-white/10" />
+          <div className="w-12 h-12 rounded-full animate-spin absolute border-4 border-solid border-primary-500 border-t-transparent shadow-[0_0_15px_rgba(99,102,241,0.5)]" />
         </div>
+      </div>
     );
+  }
+
+  if (error) {
+    return (
+      <div className="px-5 py-8">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-2xl px-5 py-4 text-red-400 font-medium">
+          {error}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-5 py-8 space-y-8 pb-32">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-extrabold tracking-tight text-white">
+          Ciao, {user?.name?.split(" ")[0] || "Padre"}
+        </h1>
+        <p className="text-surface-500 text-sm font-medium mt-1">
+          Gestione parrocchie
+        </p>
+      </div>
+
+      {/* Church list */}
+      {churches.length === 0 ? (
+        <div className="card text-center py-16 space-y-4 border-dashed border-2 border-surface-800 bg-transparent shadow-none">
+          <div className="w-16 h-16 bg-surface-900 rounded-2xl flex items-center justify-center mx-auto border border-surface-800 text-surface-600">
+            <svg
+              className="w-8 h-8"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+              />
+            </svg>
+          </div>
+          <p className="text-surface-500 text-sm font-medium">
+            Nessuna chiesa assegnata al tuo profilo
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {churches.map((church) => (
+            <ChurchCard key={church.id} church={church} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ============================================
-// Church Card with stream controls
+// Premium Church Card
 // ============================================
 
 interface ChurchCardProps {
-    church: Church;
+  church: Church;
 }
 
 function ChurchCard({ church }: ChurchCardProps) {
-    const [streamStatus, setStreamStatus] = useState<StreamStatus | null>(null);
-    const [st1Status, setSt1Status] = useState<ST1Status | null>(null);
-    const [st1Error, setSt1Error] = useState('');
+  const [streamStatus, setStreamStatus] = useState<StreamStatus | null>(null);
 
-    // Fetch detailed stream status
-    useEffect(() => {
-        const fetchStatus = async () => {
-            try {
-                const status = await api.get<StreamStatus>(`/priest/churches/${church.id}/stream/status`);
-                setStreamStatus(status);
-            } catch {
-                // ignore - church data already has streaming_active
-            }
-        };
-        fetchStatus();
-    }, [church.id]);
+  // Poll stream status for live timer
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const status = await api.get<StreamStatus>(
+          `/priest/churches/${church.id}/stream/status`,
+        );
+        setStreamStatus(status);
+      } catch {
+        // ignore — church data already has streaming_active
+      }
+    };
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 10000);
+    return () => clearInterval(interval);
+  }, [church.id]);
 
-    // Check ST1 reachability
-    useEffect(() => {
-        const checkST1 = async () => {
-            try {
-                const status = await st1.get<ST1Status>('/api/device/st1/status');
-                setSt1Status(status);
-                setSt1Error('');
-            } catch {
-                setSt1Error('ST1 non raggiungibile');
-            }
-        };
-        checkST1();
-        // Poll every 10s while streaming
-        const interval = setInterval(checkST1, 10000);
-        return () => clearInterval(interval);
-    }, []);
+  const isLive = streamStatus?.streaming_active ?? church.streaming_active;
 
-    const isLive = church.streaming_active;
-
-    return (
-        <div className="card space-y-4 relative overflow-hidden">
-            {/* Live Indicator Background Glow */}
-            {isLive && (
-                <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/10 blur-3xl rounded-full -mr-16 -mt-16 pointer-events-none" />
-            )}
-
-            {/* Church info */}
-            <div className="flex items-start justify-between relative z-10">
-                <div>
-                    <h2 className="font-semibold text-lg">{church.name}</h2>
-                    {church.address && (
-                        <p className="text-surface-400 text-sm mt-0.5">{church.address}</p>
-                    )}
-                </div>
-                {isLive ? (
-                    <span className="badge-live shadow-[0_0_15px_rgba(239,68,68,0.3)]">
-                        <span className="w-1.5 h-1.5 bg-red-400 rounded-full mr-1.5 animate-pulse" />
-                        LIVE
-                    </span>
-                ) : (
-                    <span className="badge-offline">Offline</span>
-                )}
-            </div>
-
-            {/* ST1 status */}
-            <div className="flex flex-col gap-2 relative z-10">
-                {st1Error ? (
-                    <div className="text-xs text-amber-500/80 flex items-center gap-1.5 bg-amber-500/10 px-3 py-2 rounded-lg mix-blend-plus-lighter">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                        </svg>
-                        <span>{st1Error} &bull; Usa l'hardware per avviare la diretta</span>
-                    </div>
-                ) : st1Status ? (
-                    <div className="text-xs text-surface-400 flex items-center gap-1.5">
-                        <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                        ST1 Connessa: {st1Status.state}
-                        {st1Status.state === 'streaming' && (
-                            <span className="ml-2 font-mono">
-                                ({formatDuration(st1Status.current_time)})
-                            </span>
-                        )}
-                    </div>
-                ) : null}
-
-                {/* Streaming time (from session) */}
-                {isLive && streamStatus?.session && (
-                    <div className="bg-red-500/5 border border-red-500/10 rounded-xl p-4 flex justify-between items-center mt-2 backdrop-blur-sm">
-                        <div className="text-xs text-red-400/80 font-medium uppercase tracking-wider">Durata Sessione</div>
-                        <StreamTimer startedAt={streamStatus.session.started_at} />
-                    </div>
-                )}
-            </div>
-
-            {/* Read-only reminder */}
-            {!isLive && (
-                <div className="bg-surface-800/50 border border-white/5 rounded-xl px-4 py-3 text-surface-400 text-xs">
-                    La diretta viene gestita direttamente dall'hardware ST1. Collega la macchina e premi "Start" per andare in onda.
-                </div>
-            )}
-
-            {/* Actions */}
-            <div className="pt-2 relative z-10">
-                <Link
-                    to={`/churches/${church.id}/sessions`}
-                    className="btn-ghost w-full py-3.5 flex items-center justify-center gap-2 group hover:bg-white/5 transition-colors"
-                >
-                    <svg className="w-5 h-5 text-surface-400 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    Storico Sessioni
-                </Link>
-            </div>
+  return (
+    <div
+      className={`card group space-y-5 transition-all duration-300 relative overflow-hidden ${isLive ? "border-red-500/40 bg-red-500/[0.03] ring-1 ring-red-500/20" : ""}`}
+    >
+      {/* Live Indicator overlay */}
+      {isLive && (
+        <div className="absolute top-0 right-0 px-3 py-1 bg-red-500 text-[10px] font-black uppercase tracking-tighter text-white rounded-bl-xl z-20 shadow-lg">
+          Live
         </div>
-    );
+      )}
+
+      {/* Church info */}
+      <div className="flex items-start justify-between">
+        <div className="min-w-0">
+          <h2 className="font-extrabold text-xl tracking-tight truncate pr-16">
+            {church.name}
+          </h2>
+          {church.address && (
+            <p className="text-surface-500 text-[10px] uppercase font-bold tracking-widest mt-1.5 truncate">
+              {church.address}
+            </p>
+          )}
+        </div>
+        {isLive ? (
+          <div className="w-10 h-10 bg-red-500/10 rounded-full flex items-center justify-center border border-red-500/20">
+            <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
+          </div>
+        ) : (
+          <div className="w-10 h-10 bg-surface-800 rounded-full flex items-center justify-center border border-white/5">
+            <div className="w-2.5 h-2.5 bg-surface-600 rounded-full" />
+          </div>
+        )}
+      </div>
+
+      {/* Status & Timer Section */}
+      <div
+        className={`flex items-center justify-between p-4 rounded-2xl ${isLive ? "bg-red-500/5 border border-red-500/10" : "bg-surface-800/50 border border-white/5"}`}
+      >
+        {/* Connection status */}
+        <div className="space-y-1">
+          <p
+            className={`text-[10px] uppercase font-black tracking-widest ${isLive ? "text-red-500" : "text-surface-500"}`}
+          >
+            Status
+          </p>
+          <div className="text-sm font-bold flex items-center gap-2">
+            <span>{isLive ? "In trasmissione" : "In attesa"}</span>
+          </div>
+        </div>
+
+        {/* Streaming time */}
+        {isLive && streamStatus?.session && (
+          <div className="text-right">
+            <p className="text-[10px] uppercase font-black text-red-500/60 tracking-widest mb-1">
+              Durata
+            </p>
+            <StreamTimer startedAt={streamStatus.session.started_at} />
+          </div>
+        )}
+      </div>
+
+      {/* Read-only reminder */}
+      {!isLive && (
+        <div className="flex items-start gap-3 px-1">
+          <div className="w-5 h-5 bg-surface-800 rounded-lg flex items-center justify-center shrink-0 border border-white/5">
+            <svg
+              className="w-3 h-3 text-surface-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </div>
+          <p className="text-surface-500 text-[11px] font-medium leading-relaxed">
+            La diretta viene gestita dall'hardware{" "}
+            <span className="text-white font-bold">ST1</span>. Qui puoi
+            monitorare lo stato in tempo reale.
+          </p>
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="pt-2 flex gap-3">
+        <Link
+          to={`/churches/${church.id}/sessions`}
+          className="btn-ghost flex-1 py-3 text-xs font-black uppercase tracking-widest bg-surface-800/80 hover:bg-surface-800 hover:text-white"
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          Storico
+        </Link>
+        <Link
+          to={`/churches/${church.id}/settings`}
+          className="btn-ghost px-4 py-3 bg-surface-800/80 hover:bg-surface-800"
+        >
+          <svg
+            className="w-4 h-4 text-surface-500 hover:text-white transition-colors"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+            />
+          </svg>
+        </Link>
+      </div>
+    </div>
+  );
 }
 
 // ============================================
@@ -203,27 +265,27 @@ function ChurchCard({ church }: ChurchCardProps) {
 // ============================================
 
 function StreamTimer({ startedAt }: { startedAt: string }) {
-    const [elapsed, setElapsed] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
 
-    useEffect(() => {
-        const start = new Date(startedAt).getTime();
-        const tick = () => setElapsed(Math.floor((Date.now() - start) / 1000));
-        tick();
-        const interval = setInterval(tick, 1000);
-        return () => clearInterval(interval);
-    }, [startedAt]);
+  useEffect(() => {
+    const start = new Date(startedAt).getTime();
+    const tick = () => setElapsed(Math.floor((Date.now() - start) / 1000));
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [startedAt]);
 
-    return (
-        <div className="text-2xl font-mono text-red-400 font-bold tabular-nums tracking-tight">
-            {formatDuration(elapsed)}
-        </div>
-    );
+  return (
+    <div className="text-xl font-mono text-red-500 font-bold tabular-nums tracking-tighter">
+      {formatDuration(elapsed)}
+    </div>
+  );
 }
 
 function formatDuration(totalSeconds: number): string {
-    const h = Math.floor(totalSeconds / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60);
-    const s = totalSeconds % 60;
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }

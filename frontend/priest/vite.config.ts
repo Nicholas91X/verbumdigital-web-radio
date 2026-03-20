@@ -12,26 +12,20 @@ export default defineConfig({
         react() as PluginOption,
         VitePWA({
             registerType: 'autoUpdate',
-            includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
+            includeAssets: ['pwa-192x192.svg', 'pwa-512x512.svg'],
             manifest: {
                 name: 'VerbumDigital - Priest',
                 short_name: 'VD Priest',
                 description: 'Gestione streaming per sacerdoti',
-                theme_color: '#1e293b',
+                theme_color: '#0f172a',
                 background_color: '#0f172a',
                 display: 'standalone',
                 orientation: 'portrait',
+                start_url: '/',
+                scope: '/',
                 icons: [
-                    {
-                        src: 'pwa-192x192.png',
-                        sizes: '192x192',
-                        type: 'image/png',
-                    },
-                    {
-                        src: 'pwa-512x512.png',
-                        sizes: '512x512',
-                        type: 'image/png',
-                    },
+                    { src: 'pwa-192x192.svg', sizes: '192x192', type: 'image/svg+xml' },
+                    { src: 'pwa-512x512.svg', sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' },
                 ],
             },
         }) as PluginOption,
@@ -46,7 +40,3 @@ export default defineConfig({
         port: 3001,
     },
 });
-
-
-
-

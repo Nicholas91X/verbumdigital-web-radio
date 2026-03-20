@@ -46,7 +46,7 @@ func (s *UserService) GetChurches(search string) ([]map[string]interface{}, erro
 }
 
 // GetChurch returns a single church with public details
-func (s *UserService) GetChurch(churchID uint) (map[string]interface{}, error) {
+func (s *UserService) GetChurch(churchID int32) (map[string]interface{}, error) {
 	var church models.Church
 	if err := s.DB.First(&church, churchID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -70,7 +70,7 @@ func (s *UserService) GetChurch(churchID uint) (map[string]interface{}, error) {
 }
 
 // Subscribe adds a user subscription to a church
-func (s *UserService) Subscribe(userID, churchID uint) (*models.UserSubscription, error) {
+func (s *UserService) Subscribe(userID, churchID int32) (*models.UserSubscription, error) {
 	// Verify church exists
 	var church models.Church
 	if err := s.DB.First(&church, churchID).Error; err != nil {
@@ -101,7 +101,7 @@ func (s *UserService) Subscribe(userID, churchID uint) (*models.UserSubscription
 }
 
 // Unsubscribe removes a user subscription
-func (s *UserService) Unsubscribe(userID, churchID uint) error {
+func (s *UserService) Unsubscribe(userID, churchID int32) error {
 	result := s.DB.Where("user_id = ? AND church_id = ?", userID, churchID).Delete(&models.UserSubscription{})
 	if result.RowsAffected == 0 {
 		return errors.New("subscription not found")
@@ -110,7 +110,7 @@ func (s *UserService) Unsubscribe(userID, churchID uint) error {
 }
 
 // GetSubscriptions returns all churches a user is subscribed to
-func (s *UserService) GetSubscriptions(userID uint) ([]map[string]interface{}, error) {
+func (s *UserService) GetSubscriptions(userID int32) ([]map[string]interface{}, error) {
 	var subs []models.UserSubscription
 
 	err := s.DB.
@@ -141,7 +141,7 @@ func (s *UserService) GetSubscriptions(userID uint) ([]map[string]interface{}, e
 }
 
 // UpdateNotificationPreference toggles notifications for a subscription
-func (s *UserService) UpdateNotificationPreference(userID, churchID uint, enabled bool) error {
+func (s *UserService) UpdateNotificationPreference(userID, churchID int32, enabled bool) error {
 	result := s.DB.Model(&models.UserSubscription{}).
 		Where("user_id = ? AND church_id = ?", userID, churchID).
 		Update("notifications_enabled", enabled)
@@ -154,10 +154,10 @@ func (s *UserService) UpdateNotificationPreference(userID, churchID uint, enable
 
 // GetStreamURL returns the Icecast stream URL for a given stream_id
 // User must be subscribed to the church (or we allow open access - TBD)
-func (s *UserService) GetStreamURL(userID uint, streamID string) (map[string]interface{}, error) {
+func (s *UserService) GetStreamURL(userID int32, streamID string) (map[string]interface{}, error) {
 	// Find credentials by stream_id
 	var cred models.StreamingCredential
-	if err := s.DB.Where("stream_id = ?", streamID).First(&cred).Error; err != nil {
+	if err := s.DB.Where("stream_id = ?", streamID).Preload("Church").Preload("Church.CurrentSession").First(&cred).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("stream not found")
 		}
@@ -182,10 +182,54 @@ func (s *UserService) GetStreamURL(userID uint, streamID string) (map[string]int
 	// Build Icecast URL: http://vdserv.com:8000/{stream_id}.mp3
 	streamURL := fmt.Sprintf("%s/%s.mp3", s.IcecastBaseURL, cred.StreamID)
 
-	return map[string]interface{}{
+	res := map[string]interface{}{
 		"church_id":        church.ID,
 		"church_name":      church.Name,
 		"streaming_active": church.StreamingActive,
 		"stream_url":       streamURL,
-	}, nil
+	}
+
+	if church.CurrentSession != nil {
+		res["started_at"] = church.CurrentSession.StartedAt
+	}
+
+	return res, nil
+}
+
+// GetChurchStream returns the stream info for a specific church
+func (s *UserService) GetChurchStream(userID, churchID int32) (map[string]interface{}, error) {
+	var church models.Church
+	if err := s.DB.Preload("StreamingCredential").Preload("CurrentSession").First(&church, churchID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("church not found")
+		}
+		return nil, err
+	}
+
+	// Check subscription
+	var subCount int64
+	s.DB.Model(&models.UserSubscription{}).
+		Where("user_id = ? AND church_id = ?", userID, churchID).
+		Count(&subCount)
+	if subCount == 0 {
+		return nil, errors.New("not subscribed to this church")
+	}
+
+	streamURL := ""
+	if church.StreamingCredential != nil {
+		streamURL = fmt.Sprintf("%s/%s.mp3", s.IcecastBaseURL, church.StreamingCredential.StreamID)
+	}
+
+	res := map[string]interface{}{
+		"church_id":        church.ID,
+		"church_name":      church.Name,
+		"streaming_active": church.StreamingActive,
+		"stream_url":       streamURL,
+	}
+
+	if church.CurrentSession != nil {
+		res["started_at"] = church.CurrentSession.StartedAt
+	}
+
+	return res, nil
 }

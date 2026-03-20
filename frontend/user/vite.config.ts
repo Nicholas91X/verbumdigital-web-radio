@@ -11,19 +11,26 @@ export default defineConfig({
     plugins: [
         react() as PluginOption,
         VitePWA({
+            strategies: 'injectManifest',
+            srcDir: '.',
+            filename: 'src-sw.ts',
             registerType: 'autoUpdate',
-            includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
+            injectRegister: 'auto',
+            includeAssets: ['pwa-192x192.svg', 'pwa-512x512.svg'],
             manifest: {
                 name: 'VerbumDigital - Radio Parrocchiale',
                 short_name: 'VD Radio',
                 description: 'Ascolta le trasmissioni della tua parrocchia',
-                theme_color: '#1e293b',
+                theme_color: '#0f172a',
                 background_color: '#0f172a',
                 display: 'standalone',
                 orientation: 'portrait',
+                start_url: '/',
+                scope: '/',
+                categories: ['music', 'entertainment'],
                 icons: [
-                    { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
-                    { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+                    { src: 'pwa-192x192.svg', sizes: '192x192', type: 'image/svg+xml' },
+                    { src: 'pwa-512x512.svg', sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' },
                 ],
             },
         }) as PluginOption,
@@ -38,7 +45,3 @@ export default defineConfig({
         port: 3002,
     },
 });
-
-
-
-

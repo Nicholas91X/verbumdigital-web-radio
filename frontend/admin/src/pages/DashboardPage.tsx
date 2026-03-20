@@ -58,8 +58,11 @@ export default function DashboardPage() {
     }
 
     return (
-        <div className="p-6 space-y-6">
-            <h1 className="text-2xl font-bold">Dashboard</h1>
+        <div className="px-5 py-8 space-y-8 pb-32">
+            <div>
+                <h1 className="text-2xl font-extrabold tracking-tight">Dashboard</h1>
+                <p className="text-surface-500 text-sm font-medium mt-1">Sintesi operativa del sistema</p>
+            </div>
 
             {/* Stats grid */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -93,53 +96,76 @@ export default function DashboardPage() {
             </div>
 
             {/* Recent sessions */}
-            <div>
-                <div className="flex items-center justify-between mb-3">
-                    <h2 className="font-semibold">Sessioni recenti</h2>
-                    <Link to="/sessions" className="text-primary-400 text-sm hover:text-primary-300">
-                        Vedi tutte →
+            <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-bold tracking-tight">Sessioni recenti</h2>
+                    <Link to="/sessions" className="text-primary-500 text-xs font-black uppercase tracking-widest hover:text-primary-400">
+                        Vedi tutte
                     </Link>
                 </div>
 
                 {stats?.recentSessions.length === 0 ? (
-                    <div className="card text-surface-400 text-sm text-center py-8">
+                    <div className="card text-surface-500 text-sm font-medium text-center py-10 border-dashed border-2 border-white/5 bg-transparent shadow-none">
                         Nessuna sessione registrata
                     </div>
                 ) : (
-                    <div className="card overflow-hidden p-0">
-                        <table className="w-full">
-                            <thead className="bg-surface-900/50">
-                                <tr>
-                                    <th className="table-header">Chiesa</th>
-                                    <th className="table-header">Data</th>
-                                    <th className="table-header">Durata</th>
-                                    <th className="table-header">Stato</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-surface-700">
-                                {stats?.recentSessions.map((s) => (
-                                    <tr key={s.id}>
-                                        <td className="table-cell font-medium">{s.church?.name ?? `Chiesa #${s.church_id}`}</td>
-                                        <td className="table-cell text-surface-400">
-                                            {new Date(s.started_at).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                        </td>
-                                        <td className="table-cell text-surface-400 font-mono">
-                                            {s.duration_seconds ? formatDuration(s.duration_seconds) : '—'}
-                                        </td>
-                                        <td className="table-cell">
-                                            {s.ended_at ? (
-                                                <span className="badge-offline">Conclusa</span>
-                                            ) : (
-                                                <span className="badge-live">
-                                                    <span className="w-1.5 h-1.5 bg-red-400 rounded-full mr-1.5 animate-pulse" />
-                                                    LIVE
-                                                </span>
-                                            )}
-                                        </td>
+                    <div className="space-y-4">
+                        {/* Desktop Table View */}
+                        <div className="hidden lg:block card overflow-hidden p-0">
+                            <table className="w-full">
+                                <thead className="bg-surface-900/50">
+                                    <tr>
+                                        <th className="table-header">Chiesa</th>
+                                        <th className="table-header">Data</th>
+                                        <th className="table-header">Durata</th>
+                                        <th className="table-header">Stato</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-white/5">
+                                    {stats?.recentSessions.map((s) => (
+                                        <tr key={s.id}>
+                                            <td className="table-cell font-bold text-white">{s.church?.name ?? `Chiesa #${s.church_id}`}</td>
+                                            <td className="table-cell text-surface-400 font-medium">
+                                                {new Date(s.started_at).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                            </td>
+                                            <td className="table-cell text-surface-400 font-mono">
+                                                {s.duration_seconds ? formatDuration(s.duration_seconds) : '—'}
+                                            </td>
+                                            <td className="table-cell">
+                                                {s.ended_at ? (
+                                                    <span className="badge-offline">Conclusa</span>
+                                                ) : (
+                                                    <span className="badge-live">Live</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Mobile List View */}
+                        <div className="lg:hidden space-y-3">
+                            {stats?.recentSessions.map((s) => (
+                                <div key={s.id} className="card p-4 flex items-center gap-4 active:scale-[0.98] transition-all">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-bold text-white truncate">{s.church?.name || `Chiesa #${s.church_id}`}</p>
+                                        <p className="text-surface-500 text-[10px] uppercase font-bold tracking-widest mt-1">
+                                            {new Date(s.started_at).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                        </p>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                        {!s.ended_at ? (
+                                            <div className="badge-live">Live</div>
+                                        ) : (
+                                            <p className="text-xs font-mono text-surface-400">
+                                                {s.duration_seconds ? formatDuration(s.duration_seconds) : '—'}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 )}
             </div>

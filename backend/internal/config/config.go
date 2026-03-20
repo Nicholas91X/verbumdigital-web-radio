@@ -17,15 +17,22 @@ type Config struct {
 	DBUser     string
 	DBPassword string
 	DBName     string
-	DBSSLMode  string
 
 	// JWT
 	JWTSecret          string
 	JWTExpirationHours string
 
-	// ST1 / Icecast
+	// Icecast (base URL only — used for User PWA stream URLs)
+	// Source password lives on ST1 hardware, backend doesn't need it
 	IcecastBaseURL string
-	DeviceAPIKey   string
+
+	// ST1 Device Authentication
+	DeviceAPIKey string
+
+	// webpush (VAPID)
+	VAPIDPublicKey  string
+	VAPIDPrivateKey string
+	VAPIDEmail      string
 }
 
 func Load() (*Config, error) {
@@ -35,15 +42,17 @@ func Load() (*Config, error) {
 	cfg := &Config{
 		Port:               getEnv("PORT", "8081"),
 		DBHost:             getEnv("DB_HOST", "localhost"),
-		DBPort:             getEnv("DB_PORT", "5432"),
+		DBPort:             getEnv("DB_PORT", "3306"),
 		DBUser:             getEnv("DB_USER", "st1stream"),
 		DBPassword:         getEnv("DB_PASSWORD", ""),
-		DBName:             getEnv("DB_NAME", "st1stream"),
-		DBSSLMode:          getEnv("DB_SSLMODE", "disable"),
+		DBName:             getEnv("DB_NAME", "st1"),
 		JWTSecret:          getEnv("JWT_SECRET", ""),
 		JWTExpirationHours: getEnv("JWT_EXPIRATION_HOURS", "72"),
 		IcecastBaseURL:     getEnv("ICECAST_BASE_URL", "http://vdserv.com:8000"),
 		DeviceAPIKey:       getEnv("DEVICE_API_KEY", ""),
+		VAPIDPublicKey:     getEnv("VAPID_PUBLIC_KEY", ""),
+		VAPIDPrivateKey:    getEnv("VAPID_PRIVATE_KEY", ""),
+		VAPIDEmail:         getEnv("VAPID_EMAIL", "admin@verbumdigital.com"),
 	}
 
 	if cfg.DBPassword == "" {
@@ -55,14 +64,17 @@ func Load() (*Config, error) {
 	if cfg.DeviceAPIKey == "" {
 		return nil, fmt.Errorf("DEVICE_API_KEY is required")
 	}
+	if cfg.VAPIDPublicKey == "" || cfg.VAPIDPrivateKey == "" {
+		return nil, fmt.Errorf("VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY are required")
+	}
 
 	return cfg, nil
 }
 
 func (c *Config) DSN() string {
 	return fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		c.DBHost, c.DBPort, c.DBUser, c.DBPassword, c.DBName, c.DBSSLMode,
+		"%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+		c.DBUser, c.DBPassword, c.DBHost, c.DBPort, c.DBName,
 	)
 }
 

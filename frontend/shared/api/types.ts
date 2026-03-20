@@ -78,6 +78,15 @@ export interface Admin {
     created_at: string;
 }
 
+export interface PushSubscription {
+    id: number;
+    user_id: number;
+    endpoint: string;
+    p256dh: string;
+    auth: string;
+    created_at: string;
+}
+
 export interface StreamingSession {
     id: number;
     church_id: number;
@@ -130,17 +139,10 @@ export interface StreamStatus {
     church_id: number;
     church_name: string;
     streaming_active: boolean;
-    stream_id?: string;
-    stream_key?: string;
     session?: {
         id: number;
         started_at: string;
     };
-}
-
-export interface StreamActionResponse {
-    message: string;
-    session: StreamingSession;
 }
 
 export interface ChurchListResponse {
@@ -170,17 +172,5 @@ export interface StreamURLResponse {
     church_name: string;
     streaming_active: boolean;
     stream_url: string;
-}
-
-// ============================================
-// ST1 LOCAL (smixRest on port 8080)
-// ============================================
-
-export interface ST1Status {
-    state: 'streaming' | 'stopped' | 'noid';
-    current_time: number;
-}
-
-export interface ST1Setup {
-    stream_url: string;
+    started_at?: string;
 }

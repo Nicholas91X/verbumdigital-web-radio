@@ -1,190 +1,158 @@
-# Guida Deployment
+# Deployment Guide — VerbumDigital Web Radio
 
-## Infrastruttura
+## Architecture
 
-Tutto su **Hetzner** (stesso server di Icecast e PostgreSQL):
-- OS: Linux (Ubuntu)
-- Server: vdserv.com
-- PostgreSQL: porta 5432
-- Icecast: porta 8000
-- Backend API: porta 8081
+```
+┌─────────────────────────────────────────────────────────┐
+│ Hetzner VPS                                             │
+│  ┌───────────────────┐  ┌────────────────────────────┐  │
+│  │ MySQL (st1stream)  │  │ Go Backend (:8081)         │  │
+│  │                    │←─│ api.verbumdigital.it       │  │
+│  └───────────────────┘  │ (Apache reverse proxy+SSL) │  │
+│                          └────────────────────────────┘  │
+│  ┌────────────────────────────┐                          │
+│  │ Icecast (:8000)            │                          │
+│  │ vdserv.com:8000            │                          │
+│  └────────────────────────────┘                          │
+└─────────────────────────────────────────────────────────┘
 
-## Backend (Go)
+┌─────────────────────────────────────────────────────────┐
+│ Vercel (3 separate projects, same repo)                 │
+│  ┌───────────┐  ┌───────────┐  ┌───────────────┐       │
+│  │ User PWA  │  │ Admin PWA │  │ Priest PWA    │       │
+│  │ app.vd.it │  │ admin.vd  │  │ priest.vd     │       │
+│  └───────────┘  └───────────┘  └───────────────┘       │
+│  All → api.verbumdigital.it/api/v1                      │
+└─────────────────────────────────────────────────────────┘
+```
 
-### Build
+---
+
+## 1. Vercel Setup (Frontend PWAs)
+
+### Monorepo: 3 Vercel projects, 1 GitHub repo
+
+Each PWA is a **separate Vercel project** pointing to the same Git repo, but with a different **Root Directory**.
+
+| Vercel Project | Root Directory    | Domain (suggested)        |
+| -------------- | ----------------- | ------------------------- |
+| `vd-user`      | `frontend/user`   | `app.verbumdigital.it`    |
+| `vd-admin`     | `frontend/admin`  | `admin.verbumdigital.it`  |
+| `vd-priest`    | `frontend/priest` | `priest.verbumdigital.it` |
+
+### Steps per project
+
+1. Go to [vercel.com/new](https://vercel.com/new)
+2. Import the `verbumdigital-web-radio` repo
+3. Set **Root Directory** to `frontend/user` (or `/admin` or `/priest`)
+4. Set **Framework Preset** to `Vite`
+5. **Environment Variables** — add in Vercel dashboard (Settings → Environment Variables):
+
+   | Key                     | Value                                       |
+   | ----------------------- | ------------------------------------------- |
+   | `VITE_API_BASE_URL`     | `https://api.verbumdigital.it/api/v1`       |
+   | `VITE_VAPID_PUBLIC_KEY` | `BIk3q_zf8FaTcIfWx1-z46TEJJgPfQCb0_t90R...` |
+
+   > ⚠️ `VITE_VAPID_PUBLIC_KEY` is only needed for the **User** PWA.
+
+6. Click **Deploy**
+
+### Important: `@shared` dependency
+
+All three PWAs import from `../shared` via the `@shared` alias in `vite.config.ts`.
+Vercel includes parent directories when building in a monorepo, so this works out of the box as long as the **Root Directory is set correctly** (e.g., `frontend/user` NOT `./`).
+
+---
+
+## 2. Backend (Hetzner)
+
+The backend is a Go binary served behind Apache reverse proxy with SSL.
+
+### Update & Redeploy
+
+**IMPORTANT**: The Hetzner server does not have the Go compiler installed, and the production process is managed by `verbumdigital.service`. You must cross-compile locally and upload via SCP.
 
 ```bash
+# 1. SSH into Hetzner and backup database FIRST
+ssh -p 2200 nicholas@195.201.138.249
+mysqldump --no-tablespaces -u st1stream -p'password' st1 > ~/backup_$(date +%Y%m%d_%H%M).sql
+
+# 2. On your local machine (Windows PowerShell), cross-compile for Linux
 cd backend
+$env:GOOS='linux'; $env:GOARCH='amd64'; go build -o vd-server cmd/server/main.go
 
-# Build binario per Linux
-GOOS=linux GOARCH=amd64 go build -o bin/webradio-api cmd/server/main.go
+# 3. Upload the new binary to Hetzner
+scp -P 2200 vd-server nicholas@195.201.138.249:/tmp/vd-server-new
+
+# 4. Back on Hetzner SSH, replace binary and restart the service
+cp /tmp/vd-server-new /opt/verbumdigital/backend/vd-server
+chmod +x /opt/verbumdigital/backend/vd-server
+sudo systemctl restart verbumdigital.service
+
+# 5. Verify it's running
+sudo systemctl status verbumdigital.service
+curl -I https://api.verbumdigital.it/health
 ```
 
-### Deploy
+### Adding CORS for new Vercel domains
+
+When you add Admin/Priest Vercel domains, update `main.go` CORS:
+
+```go
+AllowOrigins: []string{
+    "https://app.verbumdigital.it",
+    "https://admin.verbumdigital.it",
+    "https://priest.verbumdigital.it",
+},
+```
+
+---
+
+## 3. ST1-less Smoke Test
+
+Test the full flow without ST1 hardware using `curl`:
 
 ```bash
-# Upload binario
-scp bin/webradio-api user@vdserv.com:/opt/webradio/
+# 1. Start a fake live session
+curl -X POST https://api.verbumdigital.it/api/v1/device/stream/started \
+  -H "Content-Type: application/json" \
+  -H "X-Device-Key: YOUR_DEVICE_API_KEY" \
+  -d '{"serial_number": "SMIX-PROD-TEST"}'
 
-# Upload .env di produzione
-scp .env.production user@vdserv.com:/opt/webradio/.env
+# 2. Check User PWA → go to the church → should show "In Diretta"
+
+# 3. Stop the session
+curl -X POST https://api.verbumdigital.it/api/v1/device/stream/stopped \
+  -H "Content-Type: application/json" \
+  -H "X-Device-Key: YOUR_DEVICE_API_KEY" \
+  -d '{"serial_number": "SMIX-PROD-TEST"}'
 ```
 
-### Systemd service
+---
 
-```ini
-# /etc/systemd/system/webradio-api.service
+## Environment Variables Reference
 
-[Unit]
-Description=VerbumDigital WebRadio API
-After=network.target postgresql.service
+### Backend (.env on Hetzner)
 
-[Service]
-Type=simple
-User=webradio
-WorkingDirectory=/opt/webradio
-ExecStart=/opt/webradio/webradio-api
-EnvironmentFile=/opt/webradio/.env
-Restart=always
-RestartSec=5
+| Variable               | Description                |
+| ---------------------- | -------------------------- |
+| `PORT`                 | Server port (8081)         |
+| `DB_HOST`              | MySQL host                 |
+| `DB_PORT`              | MySQL port (3306)          |
+| `DB_USER`              | MySQL user                 |
+| `DB_PASSWORD`          | MySQL password             |
+| `DB_NAME`              | MySQL database name        |
+| `JWT_SECRET`           | JWT signing key            |
+| `JWT_EXPIRATION_HOURS` | Token lifetime             |
+| `ICECAST_BASE_URL`     | Icecast server URL         |
+| `DEVICE_API_KEY`       | Shared secret for ST1 auth |
+| `VAPID_PUBLIC_KEY`     | Web Push public key        |
+| `VAPID_PRIVATE_KEY`    | Web Push private key       |
+| `VAPID_EMAIL`          | VAPID contact email        |
 
-[Install]
-WantedBy=multi-user.target
-```
+### Frontend (Vercel dashboard)
 
-```bash
-sudo systemctl enable webradio-api
-sudo systemctl start webradio-api
-sudo systemctl status webradio-api
-
-# Logs
-sudo journalctl -u webradio-api -f
-```
-
-## Frontend (PWA)
-
-### Build
-
-```bash
-cd frontend/admin && npm run build
-cd frontend/priest && npm run build
-cd frontend/user && npm run build
-```
-
-Ogni build produce una cartella `dist/` con file statici.
-
-### Deploy con Nginx
-
-```nginx
-# /etc/nginx/sites-available/webradio
-
-# Admin PWA
-server {
-    listen 443 ssl;
-    server_name admin.verbumdigital.com;
-
-    root /var/www/webradio/admin;
-    index index.html;
-
-    # PWA: tutte le route servono index.html
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    # SSL (Let's Encrypt)
-    ssl_certificate /etc/letsencrypt/live/admin.verbumdigital.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/admin.verbumdigital.com/privkey.pem;
-}
-
-# Priest PWA
-server {
-    listen 443 ssl;
-    server_name priest.verbumdigital.com;
-
-    root /var/www/webradio/priest;
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    ssl_certificate /etc/letsencrypt/live/priest.verbumdigital.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/priest.verbumdigital.com/privkey.pem;
-}
-
-# User PWA (ogni chiesa potrebbe avere un sottodominio — TBD)
-server {
-    listen 443 ssl;
-    server_name app.verbumdigital.com;
-
-    root /var/www/webradio/user;
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    ssl_certificate /etc/letsencrypt/live/app.verbumdigital.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/app.verbumdigital.com/privkey.pem;
-}
-
-# API Proxy
-server {
-    listen 443 ssl;
-    server_name api.verbumdigital.com;
-
-    location / {
-        proxy_pass http://127.0.0.1:8081;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    ssl_certificate /etc/letsencrypt/live/api.verbumdigital.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/api.verbumdigital.com/privkey.pem;
-}
-```
-
-### Upload
-
-```bash
-# Upload build artifacts
-scp -r frontend/admin/dist/* user@vdserv.com:/var/www/webradio/admin/
-scp -r frontend/priest/dist/* user@vdserv.com:/var/www/webradio/priest/
-scp -r frontend/user/dist/* user@vdserv.com:/var/www/webradio/user/
-```
-
-## SSL (Let's Encrypt)
-
-```bash
-sudo apt install certbot python3-certbot-nginx
-
-sudo certbot --nginx -d admin.verbumdigital.com
-sudo certbot --nginx -d priest.verbumdigital.com
-sudo certbot --nginx -d app.verbumdigital.com
-sudo certbot --nginx -d api.verbumdigital.com
-```
-
-## Database migration (produzione)
-
-```bash
-# Da locale via SSH tunnel
-ssh -L 5432:localhost:5432 user@vdserv.com
-
-psql -h localhost -U st1stream -d st1stream -f backend/migrations/001_initial_schema.sql
-```
-
-## Checklist pre-deploy
-
-- [ ] .env di produzione con password sicure
-- [ ] JWT_SECRET generato (almeno 32 chars random)
-- [ ] DEVICE_API_KEY generato e comunicato a Svilen
-- [ ] DB migrato
-- [ ] Admin account seed inserito
-- [ ] SSL certificati attivi
-- [ ] Firewall: porte 443, 8000 (Icecast) aperte
-- [ ] Firewall: porta 5432 (PostgreSQL) chiusa dall'esterno
-- [ ] Nginx configurato e testato
-- [ ] Systemd service attivo
-- [ ] Backup DB configurato
+| Variable                | Required By    |
+| ----------------------- | -------------- |
+| `VITE_API_BASE_URL`     | All three PWAs |
+| `VITE_VAPID_PUBLIC_KEY` | User PWA only  |

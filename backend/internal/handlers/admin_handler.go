@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -17,7 +18,7 @@ func NewAdminHandler(adminService *services.AdminService) *AdminHandler {
 }
 
 // ============================================
-// REQUEST TYPES
+// REQUEST / RESPONSE TYPES
 // ============================================
 
 type CreateMachineRequest struct {
@@ -25,28 +26,28 @@ type CreateMachineRequest struct {
 }
 
 type UpdateMachineRequest struct {
-	MachineID string `json:"machine_id"`
+	MachineID string `json:"machine_id" binding:"required"`
 }
 
 type CreateChurchRequest struct {
 	Name      string `json:"name" binding:"required"`
 	Address   string `json:"address"`
 	LogoURL   string `json:"logo_url"`
-	MachineID *uint  `json:"machine_id"`
+	MachineID *int32 `json:"machine_id"`
 }
 
 type UpdateChurchRequest struct {
 	Name      string `json:"name"`
 	Address   string `json:"address"`
 	LogoURL   string `json:"logo_url"`
-	MachineID *uint  `json:"machine_id"`
+	MachineID *int32 `json:"machine_id"`
 }
 
 type CreatePriestRequest struct {
-	Name      string `json:"name" binding:"required"`
-	Email     string `json:"email" binding:"required,email"`
-	Password  string `json:"password" binding:"required,min=6"`
-	ChurchIDs []uint `json:"church_ids"`
+	Name      string  `json:"name" binding:"required"`
+	Email     string  `json:"email" binding:"required,email"`
+	Password  string  `json:"password" binding:"required,min=6"`
+	ChurchIDs []int32 `json:"church_ids"`
 }
 
 // ============================================
@@ -79,13 +80,13 @@ func (h *AdminHandler) CreateMachine(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"machine": machine})
+	c.JSON(http.StatusCreated, machine)
 }
 
 func (h *AdminHandler) UpdateMachine(c *gin.Context) {
-	id, err := parseUintParam(c, "id")
+	id, err := parseInt32Param(c, "id")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid machine ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
 		return
 	}
 
@@ -97,70 +98,47 @@ func (h *AdminHandler) UpdateMachine(c *gin.Context) {
 
 	machine, err := h.AdminService.UpdateMachine(id, req.MachineID)
 	if err != nil {
-		switch err.Error() {
-		case "machine not found":
+		if err.Error() == "machine not found" {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		case "machine_id already exists":
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update machine"})
+			return
 		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update machine"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"machine": machine})
+	c.JSON(http.StatusOK, machine)
 }
 
 func (h *AdminHandler) ActivateMachine(c *gin.Context) {
-	id, err := parseUintParam(c, "id")
+	id, err := parseInt32Param(c, "id")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid machine ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
 		return
 	}
 
 	machine, err := h.AdminService.ActivateMachine(id)
 	if err != nil {
-		switch err.Error() {
-		case "machine not found":
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		case "machine already activated":
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to activate machine"})
-		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Machine activated",
-		"machine": machine,
-	})
+	c.JSON(http.StatusOK, machine)
 }
 
 func (h *AdminHandler) DeactivateMachine(c *gin.Context) {
-	id, err := parseUintParam(c, "id")
+	id, err := parseInt32Param(c, "id")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid machine ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
 		return
 	}
 
 	machine, err := h.AdminService.DeactivateMachine(id)
 	if err != nil {
-		switch err.Error() {
-		case "machine not found":
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		case "machine already deactivated":
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to deactivate machine"})
-		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Machine deactivated",
-		"machine": machine,
-	})
+	c.JSON(http.StatusOK, machine)
 }
 
 // ============================================
@@ -170,7 +148,7 @@ func (h *AdminHandler) DeactivateMachine(c *gin.Context) {
 func (h *AdminHandler) ListChurches(c *gin.Context) {
 	churches, err := h.AdminService.ListChurches()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch churches"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch churches: " + err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"churches": churches})
@@ -185,27 +163,20 @@ func (h *AdminHandler) CreateChurch(c *gin.Context) {
 
 	church, cred, err := h.AdminService.CreateChurch(req.Name, req.Address, req.LogoURL, req.MachineID)
 	if err != nil {
-		switch err.Error() {
-		case "machine not found":
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		case "machine already assigned to another church":
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create church"})
-		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"church":                church,
-		"streaming_credentials": cred,
+		"church":      church,
+		"credentials": cred,
 	})
 }
 
 func (h *AdminHandler) UpdateChurch(c *gin.Context) {
-	id, err := parseUintParam(c, "id")
+	id, err := parseInt32Param(c, "id")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid church ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
 		return
 	}
 
@@ -217,18 +188,11 @@ func (h *AdminHandler) UpdateChurch(c *gin.Context) {
 
 	church, err := h.AdminService.UpdateChurch(id, req.Name, req.Address, req.LogoURL, req.MachineID)
 	if err != nil {
-		switch err.Error() {
-		case "church not found":
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		case "machine already assigned to another church":
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update church"})
-		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"church": church})
+	c.JSON(http.StatusOK, church)
 }
 
 // ============================================
@@ -257,11 +221,11 @@ func (h *AdminHandler) CreatePriest(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create priest: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create priest: %v", err)})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"priest": priest})
+	c.JSON(http.StatusCreated, priest)
 }
 
 // ============================================

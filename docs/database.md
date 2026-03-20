@@ -12,43 +12,46 @@ User:     st1stream
 ## Tabelle
 
 ### machines
+
 Rappresenta l'hardware S-Mix con scheda ST1.
 
-| Colonna | Tipo | Note |
-|---------|------|------|
-| id | SERIAL PK | |
-| machine_id | VARCHAR(50) UNIQUE | Es: "SMIX-12345" |
-| activated | BOOLEAN | Default false |
-| activation_code | VARCHAR(20) | Auto-generato (es: "A7K3NP2X") |
-| created_at | TIMESTAMP | |
-| updated_at | TIMESTAMP | |
+| Colonna         | Tipo                           | Note                           |
+| --------------- | ------------------------------ | ------------------------------ |
+| id              | INT AUTO_INCREMENT PRIMARY KEY |                                |
+| machine_id      | VARCHAR(50) UNIQUE             | Es: "SMIX-12345"               |
+| activated       | BOOLEAN                        | Default false                  |
+| activation_code | VARCHAR(20)                    | Auto-generato (es: "A7K3NP2X") |
+| created_at      | TIMESTAMP                      |                                |
+| updated_at      | TIMESTAMP                      |                                |
 
 ### churches
+
 Una chiesa è associata a una macchina (1:1).
 
-| Colonna | Tipo | Note |
-|---------|------|------|
-| id | SERIAL PK | |
-| machine_id | INTEGER UNIQUE FK→machines | |
-| name | VARCHAR(200) NOT NULL | |
-| logo_url | VARCHAR(500) | |
-| address | TEXT | |
-| streaming_active | BOOLEAN | Flag real-time |
-| current_session_id | INTEGER FK→streaming_sessions | Sessione attiva |
-| created_at | TIMESTAMP | |
-| updated_at | TIMESTAMP | |
+| Colonna            | Tipo                           | Note            |
+| ------------------ | ------------------------------ | --------------- |
+| id                 | INT AUTO_INCREMENT PRIMARY KEY |                 |
+| machine_id         | INTEGER UNIQUE FK→machines     |                 |
+| name               | VARCHAR(200) NOT NULL          |                 |
+| logo_url           | VARCHAR(500)                   |                 |
+| address            | TEXT                           |                 |
+| streaming_active   | BOOLEAN                        | Flag real-time  |
+| current_session_id | INTEGER FK→streaming_sessions  | Sessione attiva |
+| created_at         | TIMESTAMP                      |                 |
+| updated_at         | TIMESTAMP                      |                 |
 
 ### streaming_credentials
+
 Credenziali Icecast per ogni chiesa. Permanenti, generate dall'admin.
 
-| Colonna | Tipo | Note |
-|---------|------|------|
-| id | SERIAL PK | |
-| church_id | INTEGER UNIQUE FK→churches | |
-| stream_id | VARCHAR(100) UNIQUE | Es: "streamab3xk9f2m7p4" |
-| stream_key | VARCHAR(255) | Chiave segreta 32 chars |
-| created_at | TIMESTAMP | |
-| updated_at | TIMESTAMP | |
+| Colonna    | Tipo                           | Note                     |
+| ---------- | ------------------------------ | ------------------------ |
+| id         | INT AUTO_INCREMENT PRIMARY KEY |                          |
+| church_id  | INTEGER UNIQUE FK→churches     |                          |
+| stream_id  | VARCHAR(100) UNIQUE            | Es: "streamab3xk9f2m7p4" |
+| stream_key | VARCHAR(255)                   | Chiave segreta 32 chars  |
+| created_at | TIMESTAMP                      |                          |
+| updated_at | TIMESTAMP                      |                          |
 
 **URL Icecast risultante:** `http://vdserv.com:8000/{stream_id}.mp3`
 
@@ -56,90 +59,96 @@ Credenziali Icecast per ogni chiesa. Permanenti, generate dall'admin.
 
 ### priests
 
-| Colonna | Tipo | Note |
-|---------|------|------|
-| id | SERIAL PK | |
-| name | VARCHAR(200) NOT NULL | |
-| email | VARCHAR(200) UNIQUE | |
-| password_hash | VARCHAR(255) | bcrypt |
-| created_at | TIMESTAMP | |
-| updated_at | TIMESTAMP | |
+| Colonna       | Tipo                           | Note   |
+| ------------- | ------------------------------ | ------ |
+| id            | INT AUTO_INCREMENT PRIMARY KEY |        |
+| name          | VARCHAR(200) NOT NULL          |        |
+| email         | VARCHAR(200) UNIQUE            |        |
+| password_hash | VARCHAR(255)                   | bcrypt |
+| created_at    | TIMESTAMP                      |        |
+| updated_at    | TIMESTAMP                      |        |
 
 ### priest_churches
+
 Join table N:N. Un prete può gestire più chiese.
 
-| Colonna | Tipo | Note |
-|---------|------|------|
-| id | SERIAL PK | |
-| priest_id | INTEGER FK→priests | ON DELETE CASCADE |
-| church_id | INTEGER FK→churches | ON DELETE CASCADE |
-| role | VARCHAR(20) | "owner" o "assistant" |
-| created_at | TIMESTAMP | |
+| Colonna    | Tipo                           | Note                  |
+| ---------- | ------------------------------ | --------------------- |
+| id         | INT AUTO_INCREMENT PRIMARY KEY |                       |
+| priest_id  | INTEGER FK→priests             | ON DELETE CASCADE     |
+| church_id  | INTEGER FK→churches            | ON DELETE CASCADE     |
+| role       | VARCHAR(20)                    | "owner" o "assistant" |
+| created_at | TIMESTAMP                      |                       |
 
 UNIQUE(priest_id, church_id)
 
 ### users
+
 I fedeli che ascoltano gli streaming.
 
-| Colonna | Tipo | Note |
-|---------|------|------|
-| id | SERIAL PK | |
-| name | VARCHAR(200) NOT NULL | |
-| email | VARCHAR(200) UNIQUE | |
-| password_hash | VARCHAR(255) | bcrypt |
-| created_at | TIMESTAMP | |
-| updated_at | TIMESTAMP | |
+| Colonna       | Tipo                           | Note   |
+| ------------- | ------------------------------ | ------ |
+| id            | INT AUTO_INCREMENT PRIMARY KEY |        |
+| name          | VARCHAR(200) NOT NULL          |        |
+| email         | VARCHAR(200) UNIQUE            |        |
+| password_hash | VARCHAR(255)                   | bcrypt |
+| created_at    | TIMESTAMP                      |        |
+| updated_at    | TIMESTAMP                      |        |
 
 ### user_subscriptions
+
 Un utente può seguire più chiese, con preferenze notifiche individuali.
 
-| Colonna | Tipo | Note |
-|---------|------|------|
-| id | SERIAL PK | |
-| user_id | INTEGER FK→users | ON DELETE CASCADE |
-| church_id | INTEGER FK→churches | ON DELETE CASCADE |
-| notifications_enabled | BOOLEAN | Default true |
-| created_at | TIMESTAMP | |
-| updated_at | TIMESTAMP | |
+| Colonna               | Tipo                           | Note              |
+| --------------------- | ------------------------------ | ----------------- |
+| id                    | INT AUTO_INCREMENT PRIMARY KEY |                   |
+| user_id               | INTEGER FK→users               | ON DELETE CASCADE |
+| church_id             | INTEGER FK→churches            | ON DELETE CASCADE |
+| notifications_enabled | BOOLEAN                        | Default true      |
+| created_at            | TIMESTAMP                      |                   |
+| updated_at            | TIMESTAMP                      |                   |
 
 UNIQUE(user_id, church_id)
 
 ### admins
+
 Account interni (noi).
 
-| Colonna | Tipo | Note |
-|---------|------|------|
-| id | SERIAL PK | |
-| username | VARCHAR(100) UNIQUE | |
-| email | VARCHAR(200) UNIQUE | |
-| password_hash | VARCHAR(255) | bcrypt |
-| created_at | TIMESTAMP | |
+| Colonna       | Tipo                           | Note   |
+| ------------- | ------------------------------ | ------ |
+| id            | INT AUTO_INCREMENT PRIMARY KEY |        |
+| username      | VARCHAR(100) UNIQUE            |        |
+| email         | VARCHAR(200) UNIQUE            |        |
+| password_hash | VARCHAR(255)                   | bcrypt |
+| created_at    | TIMESTAMP                      |        |
 
 ### streaming_sessions
+
 Storico di ogni sessione di streaming con statistiche.
 
-| Colonna | Tipo | Note |
-|---------|------|------|
-| id | SERIAL PK | |
-| church_id | INTEGER FK→churches | |
-| started_by_priest_id | INTEGER FK→priests | Nullable |
-| started_at | TIMESTAMP NOT NULL | |
-| ended_at | TIMESTAMP | Null se in corso |
-| duration_seconds | INTEGER | Calcolato al termine |
-| recording_url | VARCHAR(500) | Futuro |
-| max_listener_count | INTEGER | Default 0, da PWA connections |
-| created_at | TIMESTAMP | |
+| Colonna              | Tipo                           | Note                          |
+| -------------------- | ------------------------------ | ----------------------------- |
+| id                   | INT AUTO_INCREMENT PRIMARY KEY |                               |
+| church_id            | INTEGER FK→churches            |                               |
+| started_by_priest_id | INTEGER FK→priests             | Nullable                      |
+| started_at           | TIMESTAMP NOT NULL             |                               |
+| ended_at             | TIMESTAMP                      | Null se in corso              |
+| duration_seconds     | INTEGER                        | Calcolato al termine          |
+| recording_url        | VARCHAR(500)                   | Futuro                        |
+| max_listener_count   | INTEGER                        | Default 0, da PWA connections |
+| created_at           | TIMESTAMP                      |                               |
 
 ### active_listeners
+
 Tracking real-time dei listener connessi (basato su heartbeat PWA).
 
-| Colonna | Tipo | Note |
-|---------|------|------|
-| id | SERIAL PK | |
-| session_id | INTEGER FK→streaming_sessions | ON DELETE CASCADE |
-| user_id | INTEGER FK→users | Nullable (anonimi) |
-| connected_at | TIMESTAMP | |
-| last_heartbeat | TIMESTAMP | Per cleanup disconnessi |
+| Colonna        | Tipo                           | Note                    |
+| -------------- | ------------------------------ | ----------------------- |
+| id             | INT AUTO_INCREMENT PRIMARY KEY |                         |
+| session_id     | INTEGER FK→streaming_sessions  | ON DELETE CASCADE       |
+| user_id        | INTEGER FK→users               | Nullable (anonimi)      |
+| connected_at   | TIMESTAMP                      |                         |
+| last_heartbeat | TIMESTAMP                      | Per cleanup disconnessi |
 
 ## Indici
 
@@ -160,10 +169,10 @@ idx_active_listeners_last_heartbeat -- Cleanup listener disconnessi
 
 ```bash
 # Applicare
-psql -h vdserv.com -U st1stream -d st1stream -f migrations/001_initial_schema.sql
+mysql -h vdserv.com -u st1stream -p st1 < migrations/001_initial_schema.sql
 
 # Rollback
-psql -h vdserv.com -U st1stream -d st1stream -f migrations/001_initial_schema_down.sql
+mysql -h vdserv.com -u st1stream -p st1 < migrations/001_initial_schema_down.sql
 ```
 
 ## Seed admin iniziale

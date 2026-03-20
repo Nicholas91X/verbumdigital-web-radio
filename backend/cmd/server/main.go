@@ -11,8 +11,9 @@ import (
 	"github.com/verbumdigital/web-radio/internal/config"
 	"github.com/verbumdigital/web-radio/internal/handlers"
 	"github.com/verbumdigital/web-radio/internal/middleware"
+	"github.com/verbumdigital/web-radio/internal/models"
 	"github.com/verbumdigital/web-radio/internal/services"
-	"gorm.io/driver/postgres"
+	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -25,7 +26,7 @@ func main() {
 	}
 
 	// Connect to database
-	db, err := gorm.Open(postgres.Open(cfg.DSN()), &gorm.Config{
+	db, err := gorm.Open(mysql.Open(cfg.DSN()), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
 	})
 	if err != nil {
@@ -43,6 +44,28 @@ func main() {
 	}
 	log.Println("Database connected successfully")
 
+	// Disable FK constraints during migration (int32 ↔ bigint unsigned mismatch)
+	db.DisableForeignKeyConstraintWhenMigrating = true
+
+	// AutoMigrate models
+	err = db.AutoMigrate(
+		&models.Machine{},
+		&models.Church{},
+		&models.StreamingCredential{},
+		&models.Priest{},
+		&models.PriestChurch{},
+		&models.User{},
+		&models.UserSubscription{},
+		&models.Admin{},
+		&models.StreamingSession{},
+		&models.ActiveListener{},
+		&models.PushSubscription{},
+	)
+	if err != nil {
+		log.Fatalf("Failed to auto-migrate: %v", err)
+	}
+	log.Println("Database migrated successfully")
+
 	// JWT config
 	jwtExpHours, _ := strconv.Atoi(cfg.JWTExpirationHours)
 	if jwtExpHours == 0 {
@@ -56,15 +79,16 @@ func main() {
 	priestService := services.NewPriestService(db)
 	userService := services.NewUserService(db, cfg.IcecastBaseURL)
 	adminService := services.NewAdminService(db)
+	notificationService := services.NewNotificationService(db, cfg.VAPIDPublicKey, cfg.VAPIDPrivateKey, cfg.VAPIDEmail)
 
 	// =====================
 	// HANDLERS
 	// =====================
 	authHandler := handlers.NewAuthHandler(authService, cfg.JWTSecret, jwtExpHours)
 	priestHandler := handlers.NewPriestHandler(priestService)
-	userHandler := handlers.NewUserHandler(userService)
+	userHandler := handlers.NewUserHandler(userService, notificationService)
 	adminHandler := handlers.NewAdminHandler(adminService)
-	deviceHandler := handlers.NewDeviceHandler(db)
+	deviceHandler := handlers.NewDeviceHandler(db, cfg.IcecastBaseURL, notificationService)
 
 	// =====================
 	// ROUTER
@@ -74,13 +98,14 @@ func main() {
 	// CORS — allow PWA origins (dev + production)
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{
+			// Development
 			"http://localhost:3000", // Admin PWA (dev)
 			"http://localhost:3001", // Priest PWA (dev)
 			"http://localhost:3002", // User PWA (dev)
-			// Production domains — add here when ready:
-			// "https://admin.verbumdigital.com",
-			// "https://priest.verbumdigital.com",
-			// "https://app.verbumdigital.com",
+			// Production (Vercel → custom domains)
+			"https://app.verbumdigital.it",
+			"https://admin.verbumdigital.it",
+			"https://priest.verbumdigital.it",
 		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Device-Key"},
@@ -120,14 +145,12 @@ func main() {
 			admin.GET("/sessions", adminHandler.ListSessions)
 		}
 
-		// PRIEST
+		// PRIEST (read-only — stream control moved to ST1 hardware)
 		priest := v1.Group("/priest")
 		priest.Use(auth, middleware.RequireRole(middleware.RolePriest))
 		{
 			priest.GET("/churches", priestHandler.GetChurches)
 			priest.GET("/churches/:id/stream/status", priestHandler.GetStreamStatus)
-			priest.POST("/churches/:id/stream/start", priestHandler.StartStream)
-			priest.POST("/churches/:id/stream/stop", priestHandler.StopStream)
 			priest.GET("/churches/:id/sessions", priestHandler.GetSessions)
 		}
 
@@ -139,9 +162,14 @@ func main() {
 			user.GET("/churches/:id", userHandler.GetChurch)
 			user.POST("/churches/:id/subscribe", userHandler.Subscribe)
 			user.DELETE("/churches/:id/subscribe", userHandler.Unsubscribe)
+			user.GET("/churches/:id/stream", userHandler.GetChurchStream)
 			user.PUT("/churches/:id/notifications", userHandler.UpdateNotifications)
 			user.GET("/subscriptions", userHandler.GetSubscriptions)
 			user.GET("/stream/:stream_id", userHandler.GetStreamURL)
+
+			// PUSH NOTIFICATIONS
+			user.POST("/push/subscribe", userHandler.PushSubscribe)
+			user.DELETE("/push/unsubscribe", userHandler.PushUnsubscribe)
 		}
 
 		// DEVICE (ST1)

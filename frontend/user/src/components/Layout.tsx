@@ -37,7 +37,7 @@ export default function Layout() {
             </main>
 
             {/* Bottom Tab Bar */}
-            <nav className="fixed bottom-0 left-0 right-0 bg-surface-800 border-t border-surface-700 flex z-10 safe-area-bottom">
+            <nav className="fixed bottom-0 left-0 right-0 bg-surface-900/80 backdrop-blur-lg border-t border-surface-800 flex z-10 safe-area-bottom">
                 <TabLink to="/" icon={<HomeIcon />} label="Home" end />
                 <TabLink to="/explore" icon={<ExploreIcon />} label="Esplora" />
                 <TabLink to="/subscriptions" icon={<HeartIcon />} label="Seguiti" />

@@ -1,466 +1,131 @@
-# API Reference
+# VerbumDigital API Reference
 
-Base URL: `http://{server}:8081/api/v1`
+Backend Base URL: `http://localhost:8081/api/v1`
 
----
+## Authentication
 
-## Autenticazione
+### Auth Methods
 
-### Public endpoints (no auth)
-
-#### POST `/auth/admin/login`
-```json
-// Request
-{ "email": "admin@verbumdigital.com", "password": "secret" }
-
-// Response 200
-{
-  "token": "eyJhbG...",
-  "user": { "id": 1, "username": "admin", "email": "admin@verbumdigital.com", "role": "admin" }
-}
-```
-
-#### POST `/auth/priest/login`
-```json
-// Request
-{ "email": "don.mario@email.com", "password": "secret" }
-
-// Response 200
-{
-  "token": "eyJhbG...",
-  "user": { "id": 1, "name": "Don Mario", "email": "don.mario@email.com", "role": "priest" }
-}
-```
-
-#### POST `/auth/user/login`
-```json
-// Request
-{ "email": "fedele@email.com", "password": "secret" }
-
-// Response 200
-{
-  "token": "eyJhbG...",
-  "user": { "id": 1, "name": "Marco Rossi", "email": "fedele@email.com", "role": "user" }
-}
-```
-
-#### POST `/auth/user/register`
-```json
-// Request
-{ "name": "Marco Rossi", "email": "fedele@email.com", "password": "secret" }
-
-// Response 201
-{
-  "token": "eyJhbG...",
-  "user": { "id": 1, "name": "Marco Rossi", "email": "fedele@email.com", "role": "user" }
-}
-```
-
-**Errori comuni (tutti gli auth):**
-- `400` — Validazione fallita (email non valida, password < 6 chars)
-- `401` — Credenziali non valide
-- `409` — Email già registrata (solo register)
+1. **JWT (Bearer Token)**: Used by Admin, Priest, and User PWAs.
+   - Header: `Authorization: Bearer <token>`
+2. **Device API Key**: Used by ST1 Hardware.
+   - Header: `X-Device-Key: <DEVICE_API_KEY>`
 
 ---
 
-## Admin endpoints
+## Device API (ST1)
 
-Header richiesto: `Authorization: Bearer <admin_token>`
+Endpoints for hardware communication. Auth via `X-Device-Key`.
 
-### Machines
+### POST /device/validate
 
-#### GET `/admin/machines`
-```json
-// Response 200
-{
-  "machines": [
-    {
-      "id": 1,
-      "machine_id": "SMIX-12345",
-      "activated": true,
-      "activation_code": "A7K3NP2X",
-      "created_at": "2026-02-06T10:00:00Z",
-      "church": { "id": 1, "name": "San Pietro" }
-    }
-  ]
-}
-```
+ST1 identifies itself on boot.
 
-#### POST `/admin/machines`
-```json
-// Request
-{ "machine_id": "SMIX-12345" }
-
-// Response 201
-{
-  "machine": {
-    "id": 1,
-    "machine_id": "SMIX-12345",
-    "activated": false,
-    "activation_code": "A7K3NP2X"
-  }
-}
-```
-
-#### PUT `/admin/machines/:id`
-```json
-// Request
-{ "machine_id": "SMIX-67890" }
-
-// Response 200
-{ "machine": { ... } }
-```
-
-#### PUT `/admin/machines/:id/activate`
-```json
-// Response 200
-{ "message": "Machine activated", "machine": { ... } }
-```
-
-#### PUT `/admin/machines/:id/deactivate`
-```json
-// Response 200
-{ "message": "Machine deactivated", "machine": { ... } }
-```
-
-### Churches
-
-#### GET `/admin/churches`
-```json
-// Response 200
-{
-  "churches": [
-    {
-      "id": 1,
-      "name": "Parrocchia San Pietro",
-      "address": "Via Roma 1, Milano",
-      "logo_url": "https://...",
-      "streaming_active": false,
-      "machine": { "id": 1, "machine_id": "SMIX-12345" },
-      "streaming_credential": { "stream_id": "streamab3xk9f2m7p4", "stream_key": "..." },
-      "priests": [{ "id": 1, "name": "Don Mario" }]
-    }
-  ]
-}
-```
-
-#### POST `/admin/churches`
-Crea la chiesa e auto-genera `streaming_credentials`.
-```json
-// Request
-{
-  "name": "Parrocchia San Pietro",
-  "address": "Via Roma 1, Milano",
-  "logo_url": "https://...",
-  "machine_id": 1
-}
-
-// Response 201
-{
-  "church": { ... },
-  "streaming_credentials": {
-    "stream_id": "streamab3xk9f2m7p4",
-    "stream_key": "aB3xK9f2..."
-  }
-}
-```
-
-#### PUT `/admin/churches/:id`
-```json
-// Request (tutti i campi opzionali)
-{ "name": "Nuovo nome", "address": "Nuovo indirizzo", "logo_url": "...", "machine_id": 2 }
-
-// Response 200
-{ "church": { ... } }
-```
-
-### Priests
-
-#### GET `/admin/priests`
-```json
-// Response 200
-{
-  "priests": [
-    {
-      "id": 1,
-      "name": "Don Mario",
-      "email": "don.mario@email.com",
-      "churches": [{ "id": 1, "name": "San Pietro" }]
-    }
-  ]
-}
-```
-
-#### POST `/admin/priests`
-```json
-// Request
-{
-  "name": "Don Mario",
-  "email": "don.mario@email.com",
-  "password": "secret123",
-  "church_ids": [1, 3]
-}
-
-// Response 201
-{ "priest": { ... } }
-```
-
-### Sessions
-
-#### GET `/admin/sessions?limit=50`
-```json
-// Response 200
-{
-  "sessions": [
-    {
-      "id": 1,
-      "church_id": 1,
-      "started_at": "2026-02-06T14:00:00Z",
-      "ended_at": "2026-02-06T15:30:00Z",
-      "duration_seconds": 5400,
-      "max_listener_count": 42,
-      "church": { "name": "San Pietro" },
-      "priest": { "name": "Don Mario" }
-    }
-  ]
-}
-```
-
----
-
-## Priest endpoints
-
-Header richiesto: `Authorization: Bearer <priest_token>`
-
-#### GET `/priest/churches`
-```json
-// Response 200
-{
-  "churches": [
-    {
-      "id": 1,
-      "name": "Parrocchia San Pietro",
-      "streaming_active": false,
-      "streaming_credential": { "stream_id": "streamab3xk9f2m7p4", "stream_key": "..." },
-      "machine": { "machine_id": "SMIX-12345" }
-    }
-  ]
-}
-```
-
-#### GET `/priest/churches/:id/stream/status`
-```json
-// Response 200
-{
-  "church_id": 1,
-  "church_name": "San Pietro",
-  "streaming_active": true,
-  "stream_id": "streamab3xk9f2m7p4",
-  "stream_key": "aB3xK9f2...",
-  "session": { "id": 5, "started_at": "2026-02-06T14:00:00Z" }
-}
-```
-
-#### POST `/priest/churches/:id/stream/start`
-```json
-// Response 200
-{
-  "message": "Stream session created",
-  "session": {
-    "id": 5,
+- **Request Body**: `{ "serial_number": "SMIX-001" }`
+- **Response**:
+  ```json
+  {
+    "valid": true,
     "church_id": 1,
-    "started_by_priest_id": 1,
-    "started_at": "2026-02-06T14:00:00Z"
+    "church_name": "San Pietro",
+    "stream_id": "san-pietro-mix",
+    "icecast_url": "http://vdserv.com:8000",
+    "mount": "/san-pietro-mix.mp3"
   }
-}
-```
-Errori: `409` stream già attivo, `412` nessuna credential configurata
+  ```
 
-#### POST `/priest/churches/:id/stream/stop`
-```json
-// Response 200
-{
-  "message": "Stream stopped",
-  "session": {
-    "id": 5,
-    "ended_at": "2026-02-06T15:30:00Z",
-    "duration_seconds": 5400
+### POST /device/stream/started
+
+Notify that actual audio streaming has begun. Triggers push notifications to subscribers.
+
+- **Request Body**: `{ "serial_number": "SMIX-001" }`
+- **Response**: `{ "success": true, "session_id": 12, "church_id": 1 }`
+
+### POST /device/stream/stopped
+
+Notify that streaming has ended.
+
+- **Request Body**: `{ "serial_number": "SMIX-001" }`
+
+---
+
+## User API
+
+Endpoints for the User PWA. Auth via JWT.
+
+### GET /user/churches/:id/stream
+
+Get current stream URL and session info.
+
+- **Response**:
+  ```json
+  {
+    "church_id": 1,
+    "church_name": "San Pietro",
+    "streaming_active": true,
+    "stream_url": "http://vdserv.com:8000/san-pietro.mp3",
+    "started_at": "2024-05-20T10:00:00Z"
   }
-}
-```
+  ```
 
-#### GET `/priest/churches/:id/sessions?limit=20`
-```json
-// Response 200
-{
-  "sessions": [ { ... }, { ... } ]
-}
-```
+### POST /user/churches/:id/subscribe
 
----
+Follow a church.
 
-## User endpoints
+### PUT /user/churches/:id/notifications
 
-Header richiesto: `Authorization: Bearer <user_token>`
+Toggle notifications for a followed church.
 
-#### GET `/user/churches?search=san`
-```json
-// Response 200
-{
-  "churches": [
-    {
-      "id": 1,
-      "name": "Parrocchia San Pietro",
-      "logo_url": "...",
-      "address": "Via Roma 1",
-      "streaming_active": true
-    }
-  ]
-}
-```
+- **Request Body**: `{ "enabled": true }`
 
-#### GET `/user/churches/:id`
-```json
-// Response 200
-{
-  "id": 1,
-  "name": "Parrocchia San Pietro",
-  "logo_url": "...",
-  "address": "Via Roma 1",
-  "streaming_active": true,
-  "subscriber_count": 156
-}
-```
+### POST /user/push/subscribe
 
-#### POST `/user/churches/:id/subscribe`
-```json
-// Response 201
-{
-  "message": "Subscribed successfully",
-  "subscription": { "id": 1, "user_id": 1, "church_id": 1, "notifications_enabled": true }
-}
-```
+Register browser Web Push subscription.
 
-#### DELETE `/user/churches/:id/subscribe`
-```json
-// Response 200
-{ "message": "Unsubscribed successfully" }
-```
+- **Request Body**:
+  ```json
+  {
+    "endpoint": "https://fcm.googleapis.com/...",
+    "p256dh": "...",
+    "auth": "..."
+  }
+  ```
 
-#### PUT `/user/churches/:id/notifications`
-```json
-// Request
-{ "enabled": false }
+### DELETE /user/push/unsubscribe
 
-// Response 200
-{ "message": "Notification preference updated" }
-```
+Unregister browser Web Push subscription.
 
-#### GET `/user/subscriptions`
-```json
-// Response 200
-{
-  "subscriptions": [
-    {
-      "subscription_id": 1,
-      "church_id": 1,
-      "church_name": "San Pietro",
-      "church_logo_url": "...",
-      "streaming_active": true,
-      "notifications_enabled": true,
-      "subscribed_at": "2026-02-01T10:00:00Z"
-    }
-  ]
-}
-```
-
-#### GET `/user/stream/:stream_id`
-Richiede subscription attiva alla chiesa.
-```json
-// Response 200
-{
-  "church_id": 1,
-  "church_name": "San Pietro",
-  "streaming_active": true,
-  "stream_url": "http://vdserv.com:8000/streamab3xk9f2m7p4.mp3"
-}
-```
-Errori: `403` non iscritto, `404` stream non trovato
+- **Request Body**:
+  ```json
+  {
+    "endpoint": "https://fcm.googleapis.com/..."
+  }
+  ```
 
 ---
 
-## Device endpoints (ST1 → Server)
+## Admin API
 
-Header richiesto: `X-Device-Key: <device_api_key>`
+Endpoints for machine and church management. Auth via JWT (Admin role).
 
-#### POST `/device/validate`
-ST1 chiama questo endpoint per verificare le credenziali prima di iniziare lo stream.
-```json
-// Request
-{ "stream_id": "streamab3xk9f2m7p4", "stream_key": "aB3xK9f2..." }
+### GET /admin/churches
 
-// Response 200
-{ "valid": true, "church_id": 1, "stream_id": "streamab3xk9f2m7p4" }
+List all churches with hardware assignments.
 
-// Response 401
-{ "valid": false, "message": "Invalid stream credentials" }
+### POST /admin/churches
 
-// Response 403
-{ "valid": false, "message": "Machine not activated" }
-```
+Create church and auto-generate streaming credentials.
 
-#### POST `/device/stream/started`
-ST1 notifica che lo stream è partito con successo.
-```json
-// Request
-{ "stream_id": "streamab3xk9f2m7p4" }
+### GET /admin/machines
 
-// Response 200
-{ "success": true, "church_id": 1 }
-```
-
-#### POST `/device/stream/stopped`
-ST1 notifica che lo stream si è fermato (stop manuale o connessione persa). Safety net per consistenza DB.
-```json
-// Request
-{ "stream_id": "streamab3xk9f2m7p4" }
-
-// Response 200
-{ "success": true, "church_id": 1 }
-```
+List all hardware units.
 
 ---
 
-## ST1 Local endpoints (smixRest, porta 8080)
+## Priest API
 
-Questi endpoint sono sul dispositivo ST1 locale, NON sul backend. La Priest PWA li chiama direttamente in rete locale.
+Endpoints for the Priest dashboard. Auth via JWT (Priest role).
 
-#### POST `/api/device/st1/play`
-```json
-// Response
-{ "success": true }
-```
+### GET /priest/churches
 
-#### POST `/api/device/st1/stop`
-```json
-// Response
-{ "success": true }
-```
-
-#### GET `/api/device/st1/status`
-```json
-// Response
-{ "state": "streaming|stopped|noid", "current_time": 125 }
-```
-
-#### GET `/api/device/st1/setup`
-```json
-// Response
-{ "stream_url": "icecast://source:key@vdserv.com:8000/streamid.mp3" }
-```
-
-#### POST `/api/device/st1/setup`
-```json
-// Request
-{ "stream_url": "icecast://source:key@vdserv.com:8000/streamid.mp3" }
-```
+List churches managed by the priest.
