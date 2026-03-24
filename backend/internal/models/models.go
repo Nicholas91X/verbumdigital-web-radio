@@ -152,6 +152,7 @@ type StreamingSession struct {
 	MaxListenerCount  int        `gorm:"default:0" json:"max_listener_count"`
 	DonationActive    bool       `gorm:"default:false" json:"donation_active"`
 	DonationPresetID  *int32     `json:"donation_preset_id,omitempty"`
+	LastHeartbeat     *time.Time `json:"last_heartbeat,omitempty"`
 	CreatedAt         time.Time  `gorm:"autoCreateTime" json:"created_at"`
 
 	Church *Church `gorm:"foreignKey:ChurchID" json:"church,omitempty"`

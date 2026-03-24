@@ -205,8 +205,53 @@ func main() {
 			device.POST("/validate", deviceHandler.Validate)
 			device.POST("/stream/started", deviceHandler.StreamStarted)
 			device.POST("/stream/stopped", deviceHandler.StreamStopped)
+			device.POST("/heartbeat", deviceHandler.Heartbeat)
 		}
 	}
+
+	// =====================
+	// HEARTBEAT WATCHDOG
+	// Checks every minute for active sessions with no heartbeat in the last 2 minutes.
+	// Closes stale sessions automatically (handles ST1 crashes / internet loss).
+	// Only acts on sessions that have received at least one heartbeat — sessions
+	// without any heartbeat (e.g. old firmware) are left untouched.
+	// =====================
+	go func() {
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			threshold := time.Now().Add(-2 * time.Minute)
+
+			var churches []models.Church
+			db.Where("streaming_active = ? AND current_session_id IS NOT NULL", true).Find(&churches)
+
+			for _, church := range churches {
+				var session models.StreamingSession
+				if err := db.First(&session, *church.CurrentSessionID).Error; err != nil {
+					continue
+				}
+
+				// Only close if heartbeat was received at least once and is now stale
+				if session.LastHeartbeat == nil || !session.LastHeartbeat.Before(threshold) {
+					continue
+				}
+
+				now := time.Now()
+				durationSecs := int(now.Sub(session.StartedAt).Seconds())
+				db.Model(&session).Updates(map[string]interface{}{
+					"ended_at":         now,
+					"duration_seconds": durationSecs,
+					"donation_active":  false,
+				})
+				db.Model(&models.Church{}).Where("id = ?", church.ID).Updates(map[string]interface{}{
+					"streaming_active":   false,
+					"current_session_id": nil,
+				})
+				log.Printf("[Watchdog] Closed stale session %d for church %s (last heartbeat: %s)",
+					session.ID, church.Name, session.LastHeartbeat.Format(time.RFC3339))
+			}
+		}
+	}()
 
 	addr := fmt.Sprintf(":%s", cfg.Port)
 	log.Printf("Server starting on %s", addr)

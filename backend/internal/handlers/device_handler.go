@@ -230,6 +230,40 @@ func (h *DeviceHandler) StreamStopped(c *gin.Context) {
 }
 
 // ============================================
+// POST /device/heartbeat
+// ST1 calls this every 30s while streaming.
+// Updates last_heartbeat on the active session.
+// If the backend stops receiving heartbeats for 2+ minutes,
+// the watchdog goroutine in main.go will auto-close the session.
+// ============================================
+
+func (h *DeviceHandler) Heartbeat(c *gin.Context) {
+	var req StreamNotifyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	church, err := h.resolveChurch(req.SerialNumber)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	if !church.StreamingActive || church.CurrentSessionID == nil {
+		c.JSON(http.StatusOK, gin.H{"success": true, "message": "No active stream"})
+		return
+	}
+
+	now := time.Now()
+	h.DB.Model(&models.StreamingSession{}).
+		Where("id = ?", *church.CurrentSessionID).
+		Update("last_heartbeat", now)
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// ============================================
 // HELPERS
 // ============================================
 
