@@ -243,3 +243,37 @@ func (h *AdminHandler) ListSessions(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"sessions": sessions})
 }
+
+// ============================================
+// DONATIONS
+// ============================================
+
+func (h *AdminHandler) ListDonations(c *gin.Context) {
+	churchID, err := parseInt32Param(c, "id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid church ID"})
+		return
+	}
+
+	from := c.Query("from")
+	to := c.Query("to")
+
+	donations, err := h.AdminService.ListDonations(churchID, from, to)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch donations"})
+		return
+	}
+
+	// Calculate basic stats
+	var totalAmount int
+	for _, d := range donations {
+		if d.Status == "completed" {
+			totalAmount += d.Amount
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"donations":    donations,
+		"total_amount": totalAmount,
+	})
+}

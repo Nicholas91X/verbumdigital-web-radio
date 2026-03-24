@@ -27,11 +27,13 @@ type Church struct {
 	MachineID        *int32    `gorm:"uniqueIndex" json:"machine_id"`
 	Name             string    `gorm:"size:200;not null" json:"name"`
 	LogoURL          string    `gorm:"size:500" json:"logo_url,omitempty"`
-	Address          string    `json:"address,omitempty"`
-	StreamingActive  bool      `gorm:"default:false" json:"streaming_active"`
-	CurrentSessionID *int32    `json:"current_session_id,omitempty"`
-	CreatedAt        time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt        time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	Address                  string    `json:"address,omitempty"`
+	StripeAccountID          *string   `gorm:"size:255" json:"stripe_account_id,omitempty"`
+	StripeOnboardingComplete bool      `gorm:"default:false" json:"stripe_onboarding_complete"`
+	StreamingActive          bool      `gorm:"default:false" json:"streaming_active"`
+	CurrentSessionID         *int32    `json:"current_session_id,omitempty"`
+	CreatedAt                time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt                time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 
 	// Relations
 	Machine             *Machine             `gorm:"foreignKey:MachineID;references:ID" json:"machine,omitempty"`
@@ -97,10 +99,11 @@ func (PriestChurch) TableName() string {
 type User struct {
 	ID           int32     `gorm:"primaryKey" json:"id"`
 	Name         string    `gorm:"size:200;not null" json:"name"`
-	Email        string    `gorm:"uniqueIndex;size:200;not null" json:"email"`
-	PasswordHash string    `gorm:"size:255;not null" json:"-"`
-	CreatedAt    time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt    time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	Email            string    `gorm:"uniqueIndex;size:200;not null" json:"email"`
+	PasswordHash     string    `gorm:"size:255;not null" json:"-"`
+	StripeCustomerID *string   `gorm:"size:255" json:"stripe_customer_id,omitempty"`
+	CreatedAt        time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt        time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 
 	Subscriptions []UserSubscription `gorm:"foreignKey:UserID;references:ID" json:"subscriptions,omitempty"`
 }
@@ -147,6 +150,8 @@ type StreamingSession struct {
 	DurationSeconds   *int       `json:"duration_seconds,omitempty"`
 	RecordingURL      string     `gorm:"size:500" json:"recording_url,omitempty"`
 	MaxListenerCount  int        `gorm:"default:0" json:"max_listener_count"`
+	DonationActive    bool       `gorm:"default:false" json:"donation_active"`
+	DonationPresetID  *int32     `json:"donation_preset_id,omitempty"`
 	CreatedAt         time.Time  `gorm:"autoCreateTime" json:"created_at"`
 
 	Church *Church `gorm:"foreignKey:ChurchID" json:"church,omitempty"`
@@ -179,4 +184,38 @@ type PushSubscription struct {
 	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
 
 	User *User `gorm:"foreignKey:UserID;references:ID" json:"user,omitempty"`
+}
+
+// ============================================
+// DONATION PRESETS
+// ============================================
+type DonationPreset struct {
+	ID        int32     `gorm:"primaryKey" json:"id"`
+	ChurchID  int32     `gorm:"not null" json:"church_id"`
+	Name      string    `gorm:"size:100;not null" json:"name"`
+	Amounts   []int     `gorm:"type:json;serializer:json;not null" json:"amounts"`
+	IsDefault bool      `gorm:"default:false" json:"is_default"`
+	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
+
+	Church *Church `gorm:"foreignKey:ChurchID;references:ID" json:"church,omitempty"`
+}
+
+// ============================================
+// DONATIONS
+// ============================================
+type Donation struct {
+	ID                      int32     `gorm:"primaryKey" json:"id"`
+	UserID                  *int32    `json:"user_id,omitempty"`
+	ChurchID                int32     `gorm:"not null" json:"church_id"`
+	SessionID               *int32    `json:"session_id,omitempty"`
+	Amount                  int       `gorm:"not null" json:"amount"` // in cents
+	Currency                string    `gorm:"size:3;default:'eur'" json:"currency"`
+	StripePaymentIntentID   *string   `gorm:"size:255" json:"stripe_payment_intent_id,omitempty"`
+	StripeCheckoutSessionID *string   `gorm:"size:255" json:"stripe_checkout_session_id,omitempty"`
+	Status                  string    `gorm:"type:enum('pending','completed','failed');default:'pending'" json:"status"`
+	CreatedAt               time.Time `gorm:"autoCreateTime" json:"created_at"`
+
+	User    *User             `gorm:"foreignKey:UserID;references:ID" json:"user,omitempty"`
+	Church  *Church           `gorm:"foreignKey:ChurchID;references:ID" json:"church,omitempty"`
+	Session *StreamingSession `gorm:"foreignKey:SessionID;references:ID" json:"session,omitempty"`
 }

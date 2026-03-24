@@ -60,6 +60,8 @@ func main() {
 		&models.StreamingSession{},
 		&models.ActiveListener{},
 		&models.PushSubscription{},
+		&models.DonationPreset{},
+		&models.Donation{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate: %v", err)
@@ -80,6 +82,8 @@ func main() {
 	userService := services.NewUserService(db, cfg.IcecastBaseURL)
 	adminService := services.NewAdminService(db)
 	notificationService := services.NewNotificationService(db, cfg.VAPIDPublicKey, cfg.VAPIDPrivateKey, cfg.VAPIDEmail)
+	stripeService := services.NewStripeService(db, cfg.StripeSecretKey, cfg.AppBaseURL)
+	donationService := services.NewDonationService(db, cfg.StripeSecretKey, cfg.StripeWebhookSecret, cfg.AppBaseURL)
 
 	// =====================
 	// HANDLERS
@@ -89,6 +93,8 @@ func main() {
 	userHandler := handlers.NewUserHandler(userService, notificationService)
 	adminHandler := handlers.NewAdminHandler(adminService)
 	deviceHandler := handlers.NewDeviceHandler(db, cfg.IcecastBaseURL, notificationService)
+	stripeHandler := handlers.NewStripeHandler(stripeService)
+	donationHandler := handlers.NewDonationHandler(donationService)
 
 	// =====================
 	// ROUTER
@@ -128,6 +134,12 @@ func main() {
 		v1.POST("/auth/user/login", authHandler.UserLogin)
 		v1.POST("/auth/user/register", authHandler.UserRegister)
 
+		// DONATIONS AND STRIPE (public / optionally authenticated)
+		v1.GET("/stripe/connect/callback", stripeHandler.ConnectCallback)
+		v1.POST("/stripe/webhook", donationHandler.HandleWebhook)
+		v1.GET("/sessions/:id/donation/status", donationHandler.GetDonationStatus)
+		v1.POST("/sessions/:id/donation/checkout", donationHandler.CreateCheckoutSession)
+
 		// ADMIN
 		admin := v1.Group("/admin")
 		admin.Use(auth, middleware.RequireRole(middleware.RoleAdmin))
@@ -143,6 +155,11 @@ func main() {
 			admin.GET("/priests", adminHandler.ListPriests)
 			admin.POST("/priests", adminHandler.CreatePriest)
 			admin.GET("/sessions", adminHandler.ListSessions)
+
+			// STRIPE ONBOARDING & DONATIONS
+			admin.POST("/churches/:id/stripe/onboard", stripeHandler.OnboardChurch)
+			admin.GET("/churches/:id/stripe/status", stripeHandler.GetOnboardingStatus)
+			admin.GET("/churches/:id/donations", adminHandler.ListDonations)
 		}
 
 		// PRIEST (read-only — stream control moved to ST1 hardware)
@@ -152,6 +169,15 @@ func main() {
 			priest.GET("/churches", priestHandler.GetChurches)
 			priest.GET("/churches/:id/stream/status", priestHandler.GetStreamStatus)
 			priest.GET("/churches/:id/sessions", priestHandler.GetSessions)
+
+			// DONATIONS
+			priest.GET("/churches/:id/donation-presets", donationHandler.GetPresets)
+			priest.POST("/churches/:id/donation-presets", donationHandler.CreatePreset)
+			priest.PUT("/donation-presets/:id", donationHandler.UpdatePreset)
+			priest.DELETE("/donation-presets/:id", donationHandler.DeletePreset)
+			priest.POST("/donation-presets/:id/set-default", donationHandler.SetDefaultPreset)
+			priest.POST("/sessions/:id/donation/open", donationHandler.OpenDonation)
+			priest.POST("/sessions/:id/donation/close", donationHandler.CloseDonation)
 		}
 
 		// USER

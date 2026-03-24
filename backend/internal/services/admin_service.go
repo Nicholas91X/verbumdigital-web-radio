@@ -312,6 +312,21 @@ func (s *AdminService) ListSessions(limit int) ([]models.StreamingSession, error
 // HELPERS
 // ============================================
 
+func (s *AdminService) ListDonations(churchID int32, from, to string) ([]models.Donation, error) {
+	var donations []models.Donation
+	query := s.DB.Where("church_id = ?", churchID)
+
+	if from != "" {
+		query = query.Where("created_at >= ?", from)
+	}
+	if to != "" {
+		query = query.Where("created_at <= ?", to)
+	}
+
+	err := query.Preload("Session").Preload("User").Order("created_at DESC").Find(&donations).Error
+	return donations, err
+}
+
 func generateActivationCode(length int) (string, error) {
 	const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // No 0, O, 1, I to avoid confusion
 	code := make([]byte, length)
