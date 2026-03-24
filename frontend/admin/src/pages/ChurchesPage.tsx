@@ -646,8 +646,8 @@ function ChurchDonationsModal({
                 donations.map((d) => (
                   <div key={d.id} className="bg-surface-900/50 rounded-lg p-3 flex justify-between items-center">
                     <div>
-                      <p className="text-sm font-bold text-white">{d.donor_name || "Anonimo"}</p>
-                      <p className="text-xs text-surface-400">{d.donor_email || "Nessuna email"}</p>
+                      <p className="text-sm font-bold text-white">{d.user?.name || "Anonimo"}</p>
+                      <p className="text-xs text-surface-400">{d.user?.email || "Nessuna email"}</p>
                       <p className="text-[10px] text-surface-500 mt-1">
                         {new Date(d.created_at).toLocaleString("it-IT", {
                           day: "2-digit",
@@ -660,9 +660,9 @@ function ChurchDonationsModal({
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold text-emerald-400">
-                        {d.currency?.toUpperCase() === "EUR" ? "€" : ""}{(d.amount_cents / 100).toFixed(2)}
+                        {d.currency?.toUpperCase() === "EUR" ? "€" : ""}{(d.amount / 100).toFixed(2)}
                       </p>
-                      {d.status === "succeeded" ? (
+                      {d.status === "completed" ? (
                         <span className="text-[10px] uppercase font-bold text-emerald-400">Completata</span>
                       ) : (
                         <span className="text-[10px] uppercase font-bold text-amber-400">{d.status}</span>

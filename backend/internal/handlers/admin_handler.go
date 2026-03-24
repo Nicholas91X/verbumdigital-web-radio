@@ -273,7 +273,7 @@ func (h *AdminHandler) ListDonations(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"donations":    donations,
-		"total_amount": totalAmount,
+		"donations":          donations,
+		"total_amount_cents": totalAmount,
 	})
 }

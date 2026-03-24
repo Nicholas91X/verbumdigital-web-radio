@@ -130,7 +130,7 @@ export default function SettingsPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-extrabold text-white text-lg">
-                          {p.currency.toUpperCase() === 'EUR' ? '€' : p.currency} {(p.amount_cents / 100).toFixed(2)}
+                          {p.amounts.map(a => `€${(a / 100).toFixed(2)}`).join(' · ')}
                         </span>
                         {p.is_default && (
                           <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
@@ -208,8 +208,7 @@ function CreatePresetModal({
 
       await api.post(`/priest/churches/${churchId}/donation-presets`, {
         name,
-        amount_cents: amountCents,
-        currency: "eur",
+        amounts: [amountCents],
         is_default: isDefault,
       });
       setName("");

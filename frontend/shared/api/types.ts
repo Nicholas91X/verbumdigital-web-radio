@@ -109,25 +109,27 @@ export interface DonationPreset {
     id: number;
     church_id: number;
     name: string;
-    amount_cents: number;
-    currency: string;
+    amounts: number[];   // array of amounts in cents
     is_default: boolean;
     created_at: string;
-    updated_at: string;
 }
 
 export interface Donation {
     id: number;
     church_id: number;
     session_id?: number | null;
-    amount_cents: number;
+    user_id?: number | null;
+    amount: number;      // in cents
     currency: string;
-    stripe_payment_intent_id: string;
-    status: string;
-    donor_name: string;
-    donor_email: string;
+    stripe_payment_intent_id?: string;
+    stripe_checkout_session_id?: string;
+    status: 'pending' | 'completed' | 'failed';
     created_at: string;
-    updated_at: string;
+    user?: {
+        id: number;
+        name: string;
+        email: string;
+    };
 }
 
 // ============================================
