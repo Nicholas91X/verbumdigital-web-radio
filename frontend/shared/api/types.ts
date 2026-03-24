@@ -19,6 +19,8 @@ export interface Church {
     name: string;
     logo_url?: string;
     address?: string;
+    stripe_account_id?: string;
+    stripe_onboarding_complete?: boolean;
     streaming_active: boolean;
     current_session_id?: number;
     created_at: string;
@@ -96,9 +98,36 @@ export interface StreamingSession {
     duration_seconds?: number;
     recording_url?: string;
     max_listener_count: number;
+    donation_active?: boolean;
+    donation_preset_id?: number | null;
     created_at: string;
     church?: Church;
     priest?: Priest;
+}
+
+export interface DonationPreset {
+    id: number;
+    church_id: number;
+    name: string;
+    amount_cents: number;
+    currency: string;
+    is_default: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface Donation {
+    id: number;
+    church_id: number;
+    session_id?: number | null;
+    amount_cents: number;
+    currency: string;
+    stripe_payment_intent_id: string;
+    status: string;
+    donor_name: string;
+    donor_email: string;
+    created_at: string;
+    updated_at: string;
 }
 
 // ============================================
@@ -142,6 +171,8 @@ export interface StreamStatus {
     session?: {
         id: number;
         started_at: string;
+        donation_active?: boolean;
+        donation_preset_id?: number | null;
     };
 }
 
@@ -173,4 +204,10 @@ export interface StreamURLResponse {
     streaming_active: boolean;
     stream_url: string;
     started_at?: string;
+    session?: {
+        id: number;
+        started_at: string;
+        donation_active?: boolean;
+        donation_preset_id?: number | null;
+    };
 }

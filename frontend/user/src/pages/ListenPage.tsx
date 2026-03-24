@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "@shared/api/client";
-import type { StreamURLResponse } from "@shared/api/types";
+import type { StreamURLResponse, DonationPreset } from "@shared/api/types";
+import DonationModal from "@/components/DonationModal";
 
 type PlayerState =
   | "loading" // Initial fetch
@@ -30,6 +31,8 @@ export default function ListenPage() {
   const [retryIn, setRetryIn] = useState(0);
   const [isLive, setIsLive] = useState(true);
   const [pausedAt, setPausedAt] = useState<number | null>(null);
+  const [donationPreset, setDonationPreset] = useState<DonationPreset | null>(null);
+  const [donationModalOpen, setDonationModalOpen] = useState(false);
 
   // ── Fetch stream info ──────────────────────────
   const fetchStream = useCallback(async () => {
@@ -265,6 +268,33 @@ export default function ListenPage() {
     return () => clearInterval(poll);
   }, [churchId, playerState]);
 
+  // ── Poll Donation Status ───────────────────────
+  useEffect(() => {
+    if (!streamInfo?.session?.id || playerState === "offline") {
+      setDonationPreset(null);
+      return;
+    }
+
+    const fetchDonationStatus = async () => {
+      try {
+        const data = await api.get<{ donation_active: boolean; preset: DonationPreset }>(
+          `/sessions/${streamInfo.session?.id}/donation/status`
+        );
+        if (data.donation_active) {
+          setDonationPreset(data.preset);
+        } else {
+          setDonationPreset(null);
+        }
+      } catch (err) {
+        setDonationPreset(null);
+      }
+    };
+
+    fetchDonationStatus();
+    const interval = setInterval(fetchDonationStatus, 15000);
+    return () => clearInterval(interval);
+  }, [streamInfo?.session?.id, playerState]);
+
   // ── Go Live handler ────────────────────────────
   const goLive = useCallback(() => {
     if (!audioRef.current || !streamInfo) return;
@@ -341,6 +371,15 @@ export default function ListenPage() {
 
   return (
     <div className="min-h-[calc(100vh-8rem)] flex flex-col items-center justify-center px-6 py-8 relative overflow-hidden">
+      {/* Donation Modal */}
+      {donationPreset && streamInfo?.session?.id && (
+        <DonationModal
+          open={donationModalOpen}
+          onClose={() => setDonationModalOpen(false)}
+          sessionId={streamInfo.session.id}
+          preset={donationPreset}
+        />
+      )}
       {/* Background Glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] pointer-events-none opacity-20">
         <div
@@ -751,6 +790,32 @@ export default function ListenPage() {
           </div>
         ) : null}
       </div>
+
+      {/* Donation Floating Button */}
+      {donationPreset && (
+        <div className="fixed bottom-32 right-6 z-40 animate-in fade-in slide-in-from-bottom-5 duration-700">
+          <button
+            onClick={() => setDonationModalOpen(true)}
+            className="group relative flex items-center gap-3 bg-primary-600 px-6 py-4 rounded-full shadow-2xl shadow-primary-900/50 
+                       hover:bg-primary-500 hover:scale-105 active:scale-95 transition-all text-white border border-white/20"
+          >
+            <div className="relative">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A4.86 4.86 0 0012 9c-1.39 0-2.618.581-3.488 1.514M21 21H3" />
+              </svg>
+              <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+              </span>
+            </div>
+            <div className="flex flex-col items-start leading-none">
+              <span className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">Sostieni</span>
+              <span className="text-sm font-black tracking-tight italic">Parroco</span>
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

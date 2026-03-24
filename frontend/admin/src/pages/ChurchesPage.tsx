@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, type FormEvent } from "react";
 import { api } from "@shared/api/client";
-import type { Church, Machine, StreamingCredential } from "@shared/api/types";
+import type { Church, Machine, StreamingCredential, Donation } from "@shared/api/types";
 import Modal from "@/components/Modal";
 
 export default function ChurchesPage() {
@@ -9,6 +9,7 @@ export default function ChurchesPage() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [editChurch, setEditChurch] = useState<Church | null>(null);
+  const [donationsChurch, setDonationsChurch] = useState<Church | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -83,6 +84,14 @@ export default function ChurchesPage() {
                       {c.streaming_credential?.stream_id || "—"}
                     </td>
                     <td className="table-cell text-right">
+                      {c.stripe_onboarding_complete && (
+                        <button
+                          onClick={() => setDonationsChurch(c)}
+                          className="mr-4 text-xs font-bold text-emerald-500 hover:text-emerald-400 uppercase tracking-widest"
+                        >
+                          Donazioni
+                        </button>
+                      )}
                       <button
                         onClick={() => setEditChurch(c)}
                         className="text-xs font-bold text-primary-500 hover:text-primary-400 uppercase tracking-widest"
@@ -135,12 +144,22 @@ export default function ChurchesPage() {
                   </div>
                 </div>
 
-                <button
-                  onClick={() => setEditChurch(c)}
-                  className="btn-ghost w-full py-3 text-xs font-bold uppercase tracking-widest"
-                >
-                  Modifica Dettagli
-                </button>
+                <div className="flex flex-col border-t border-white/5">
+                  {c.stripe_onboarding_complete && (
+                    <button
+                      onClick={() => setDonationsChurch(c)}
+                      className="btn-ghost w-full py-3 text-xs text-emerald-500 font-bold uppercase tracking-widest border-b border-white/5"
+                    >
+                      Storico Donazioni
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setEditChurch(c)}
+                    className="btn-ghost w-full py-3 text-xs font-bold uppercase tracking-widest"
+                  >
+                    Modifica Dettagli
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -190,6 +209,15 @@ export default function ChurchesPage() {
             fetchData();
           }}
           availableMachines={availableMachines}
+        />
+      )}
+
+      {/* Donations Modal */}
+      {donationsChurch && (
+        <ChurchDonationsModal
+          open={true}
+          church={donationsChurch}
+          onClose={() => setDonationsChurch(null)}
         />
       )}
     </div>
@@ -390,6 +418,28 @@ function EditChurchModal({
   );
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingStripe, setLoadingStripe] = useState(false);
+
+  // Auto-refresh Stripe status when opening modal
+  useEffect(() => {
+    // Optionally we can fetch status here if we want to be exact,
+    // but the church object already has stripe_onboarding_complete
+  }, []);
+
+  const handleStripeOnboard = async () => {
+    setLoadingStripe(true);
+    setError("");
+    try {
+      const res = await api.post<{ url: string }>(`/admin/churches/${church.id}/stripe/onboard`);
+      if (res && res.url) {
+        window.location.href = res.url;
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Errore inizializzazione Stripe");
+    } finally {
+      setLoadingStripe(false);
+    }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -483,6 +533,37 @@ function EditChurchModal({
           </div>
         )}
 
+        {/* Stripe Connect */}
+        <div className="bg-surface-900/50 rounded-lg p-3 space-y-3">
+          <div className="flex justify-between items-center">
+            <p className="text-xs text-surface-500 uppercase tracking-wider">
+              Stripe Connect (Donazioni)
+            </p>
+            {church.stripe_onboarding_complete ? (
+              <span className="text-[10px] font-bold text-emerald-400 uppercase bg-emerald-500/10 px-2 py-0.5 rounded-full">Attivo</span>
+            ) : (
+              <span className="text-[10px] font-bold text-amber-400 uppercase bg-amber-500/10 px-2 py-0.5 rounded-full">Non Attivo</span>
+            )}
+          </div>
+          
+          <p className="text-xs text-surface-400">
+            {church.stripe_onboarding_complete 
+              ? "L'account Stripe della parrocchia è configurato per ricevere donazioni." 
+              : "Configura un account Stripe Connect per permettere alla parrocchia di ricevere donazioni direttamente dai fedeli."}
+          </p>
+
+          {!church.stripe_onboarding_complete && (
+            <button
+              type="button"
+              onClick={handleStripeOnboard}
+              disabled={loadingStripe}
+              className="btn-primary w-full text-xs py-2 mt-2 flex justify-center items-center gap-2"
+            >
+              {loadingStripe ? "Caricamento..." : "Avvia Configurazione Stripe"}
+            </button>
+          )}
+        </div>
+
         <div className="flex gap-3 justify-end">
           <button type="button" onClick={onClose} className="btn-ghost">
             Annulla
@@ -492,6 +573,114 @@ function EditChurchModal({
           </button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+// ============================================
+// Church Donations Modal
+// ============================================
+
+function ChurchDonationsModal({
+  open,
+  church,
+  onClose,
+}: {
+  open: boolean;
+  church: Church;
+  onClose: () => void;
+}) {
+  const [donations, setDonations] = useState<Donation[]>([]);
+  const [totalCents, setTotalCents] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    if (open) {
+      setLoading(true);
+      api
+        .get<{ donations: Donation[]; total_amount_cents: number }>(
+          `/admin/churches/${church.id}/donations`
+        )
+        .then((res) => {
+          if (!active) return;
+          setDonations(res.donations || []);
+          setTotalCents(res.total_amount_cents || 0);
+        })
+        .catch((err) => {
+          if (!active) return;
+          setError(err instanceof Error ? err.message : "Errore caricamento donazioni");
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    }
+    return () => {
+      active = false;
+    };
+  }, [open, church.id]);
+
+  return (
+    <Modal open={open} onClose={onClose} title={`Donazioni — ${church.name}`}>
+      <div className="space-y-4">
+        {error && <ErrorBanner message={error} />}
+
+        {loading ? (
+          <Loading />
+        ) : (
+          <>
+            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 flex flex-col items-center justify-center">
+              <span className="text-xs text-emerald-400 font-bold uppercase tracking-widest mb-1">
+                Totale Ricevuto
+              </span>
+              <span className="text-3xl font-extrabold text-white">
+                €{(totalCents / 100).toFixed(2)}
+              </span>
+            </div>
+
+            <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+              {donations.length === 0 ? (
+                <EmptyState message="Nessuna donazione ricevuta finora" />
+              ) : (
+                donations.map((d) => (
+                  <div key={d.id} className="bg-surface-900/50 rounded-lg p-3 flex justify-between items-center">
+                    <div>
+                      <p className="text-sm font-bold text-white">{d.donor_name || "Anonimo"}</p>
+                      <p className="text-xs text-surface-400">{d.donor_email || "Nessuna email"}</p>
+                      <p className="text-[10px] text-surface-500 mt-1">
+                        {new Date(d.created_at).toLocaleString("it-IT", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit"
+                        })}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-emerald-400">
+                        {d.currency?.toUpperCase() === "EUR" ? "€" : ""}{(d.amount_cents / 100).toFixed(2)}
+                      </p>
+                      {d.status === "succeeded" ? (
+                        <span className="text-[10px] uppercase font-bold text-emerald-400">Completata</span>
+                      ) : (
+                        <span className="text-[10px] uppercase font-bold text-amber-400">{d.status}</span>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </>
+        )}
+
+        <div className="flex justify-end pt-2">
+          <button type="button" onClick={onClose} className="btn-primary">
+            Chiudi
+          </button>
+        </div>
+      </div>
     </Modal>
   );
 }

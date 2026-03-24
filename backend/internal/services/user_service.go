@@ -189,8 +189,14 @@ func (s *UserService) GetStreamURL(userID int32, streamID string) (map[string]in
 		"stream_url":       streamURL,
 	}
 
-	if church.CurrentSession != nil {
-		res["started_at"] = church.CurrentSession.StartedAt
+	if cred.Church.CurrentSession != nil {
+		res["started_at"] = cred.Church.CurrentSession.StartedAt
+		res["session"] = map[string]interface{}{
+			"id":                 cred.Church.CurrentSession.ID,
+			"started_at":         cred.Church.CurrentSession.StartedAt,
+			"donation_active":     cred.Church.CurrentSession.DonationActive,
+			"donation_preset_id": cred.Church.CurrentSession.DonationPresetID,
+		}
 	}
 
 	return res, nil
@@ -229,6 +235,12 @@ func (s *UserService) GetChurchStream(userID, churchID int32) (map[string]interf
 
 	if church.CurrentSession != nil {
 		res["started_at"] = church.CurrentSession.StartedAt
+		res["session"] = map[string]interface{}{
+			"id":                 church.CurrentSession.ID,
+			"started_at":         church.CurrentSession.StartedAt,
+			"donation_active":     church.CurrentSession.DonationActive,
+			"donation_preset_id": church.CurrentSession.DonationPresetID,
+		}
 	}
 
 	return res, nil

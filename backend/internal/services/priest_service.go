@@ -48,8 +48,10 @@ func (s *PriestService) GetStreamStatus(priestID, churchID int32) (map[string]in
 
 	if church.CurrentSession != nil {
 		res["session"] = map[string]interface{}{
-			"id":         church.CurrentSession.ID,
-			"started_at": church.CurrentSession.StartedAt,
+			"id":                 church.CurrentSession.ID,
+			"started_at":         church.CurrentSession.StartedAt,
+			"donation_active":    church.CurrentSession.DonationActive,
+			"donation_preset_id": church.CurrentSession.DonationPresetID,
 		}
 	}
 

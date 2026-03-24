@@ -174,13 +174,31 @@ function ChurchCard({ church }: ChurchCardProps) {
           </div>
         </div>
 
-        {/* Streaming time */}
+        {/* Streaming time & Donation Toggle */}
         {isLive && streamStatus?.session && (
-          <div className="text-right">
-            <p className="text-[10px] uppercase font-black text-red-500/60 tracking-widest mb-1">
-              Durata
-            </p>
-            <StreamTimer startedAt={streamStatus.session.started_at} />
+          <div className="flex items-center gap-6">
+            <div className="text-right">
+              <p className="text-[10px] uppercase font-black text-red-500/60 tracking-widest mb-1">
+                Durata
+              </p>
+              <StreamTimer startedAt={streamStatus.session.started_at} />
+            </div>
+
+            {church.stripe_onboarding_complete && (
+              <div className="h-10 w-px bg-white/5 mx-2 hidden sm:block" />
+            )}
+
+            {church.stripe_onboarding_complete && (
+              <DonationControl 
+                sessionId={streamStatus.session.id} 
+                churchId={church.id}
+                isActive={streamStatus.session.donation_active || false}
+                onUpdate={() => {
+                  // The parent fetches status every 10s, but we can trigger immediate refresh if needed
+                  // but for now let the next poll catch it
+                }}
+              />
+            )}
           </div>
         )}
       </div>
@@ -256,6 +274,73 @@ function ChurchCard({ church }: ChurchCardProps) {
           </svg>
         </Link>
       </div>
+    </div>
+  );
+}
+
+// ============================================
+// Donation Control Component
+// ============================================
+
+interface DonationControlProps {
+  sessionId: number;
+  churchId: number;
+  isActive: boolean;
+  onUpdate: () => void;
+}
+
+function DonationControl({ sessionId, churchId, isActive, onUpdate }: DonationControlProps) {
+  const [loading, setLoading] = useState(false);
+
+  const toggleDonations = async () => {
+    setLoading(true);
+    try {
+      if (isActive) {
+        await api.post(`/priest/sessions/${sessionId}/donation/close`, {});
+      } else {
+        // Fetch presets to see if we have one to use
+        const data = await api.get<{ presets: any[] }>(`/priest/churches/${churchId}/donation-presets`);
+        const defaultPreset = data.presets?.find(p => p.is_default) || data.presets?.[0];
+
+        if (!defaultPreset) {
+          alert("Nessun preset di donazione configurato. Vai nelle impostazioni per crearne uno.");
+          setLoading(false);
+          return;
+        }
+
+        await api.post(`/priest/sessions/${sessionId}/donation/open`, {
+          preset_id: defaultPreset.id
+        });
+      }
+      onUpdate();
+    } catch (err) {
+      alert("Errore durante la modifica delle donazioni");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="text-right">
+      <p className={`text-[10px] uppercase font-black tracking-widest mb-1 ${isActive ? "text-green-500" : "text-surface-500"}`}>
+        Donazioni
+      </p>
+      <button
+        onClick={toggleDonations}
+        disabled={loading}
+        className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-tighter transition-all ${
+          isActive 
+            ? "bg-green-500/20 text-green-400 border border-green-500/30" 
+            : "bg-surface-800 text-surface-400 border border-white/5"
+        }`}
+      >
+        {loading ? (
+          <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+        ) : (
+          <div className={`w-2 h-2 rounded-full ${isActive ? "bg-green-500 animate-pulse" : "bg-surface-600"}`} />
+        )}
+        {isActive ? "Aperte" : "Chiuse"}
+      </button>
     </div>
   );
 }

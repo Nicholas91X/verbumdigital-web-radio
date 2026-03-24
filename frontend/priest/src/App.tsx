@@ -4,6 +4,7 @@ import Layout from '@/components/Layout';
 import LoginPage from '@/pages/LoginPage';
 import DashboardPage from '@/pages/DashboardPage';
 import SessionsPage from '@/pages/SessionsPage';
+import SettingsPage from '@/pages/SettingsPage';
 import type { ReactNode } from 'react';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -61,6 +62,7 @@ export default function App() {
                     >
                         <Route path="/" element={<DashboardPage />} />
                         <Route path="/churches/:churchId/sessions" element={<SessionsPage />} />
+                        <Route path="/churches/:churchId/settings" element={<SettingsPage />} />
                     </Route>
 
                     {/* Fallback */}
