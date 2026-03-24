@@ -271,32 +271,29 @@ export default function ListenPage() {
     return () => clearInterval(poll);
   }, [churchId, playerState]);
 
-  // ── Poll Donation Status ───────────────────────
+  // ── Donation status — driven by streamInfo ────
+  // streamInfo is refreshed every 15s by the broadcast poll above.
+  // When session changes or donation_active toggles, we fetch the preset once.
+  // No separate polling loop needed.
   useEffect(() => {
-    if (!streamInfo?.session?.id || playerState === "offline") {
+    if (!streamInfo?.session?.id || !streamInfo.session.donation_active || playerState === "offline") {
       setDonationPreset(null);
       return;
     }
 
-    const fetchDonationStatus = async () => {
-      try {
-        const data = await api.get<{ donation_active: boolean; preset: DonationPreset }>(
-          `/sessions/${streamInfo.session?.id}/donation/status`
-        );
-        if (data.donation_active) {
+    api
+      .get<{ donation_active: boolean; preset: DonationPreset }>(
+        `/sessions/${streamInfo.session.id}/donation/status`,
+      )
+      .then((data) => {
+        if (data.donation_active && data.preset) {
           setDonationPreset(data.preset);
         } else {
           setDonationPreset(null);
         }
-      } catch (err) {
-        setDonationPreset(null);
-      }
-    };
-
-    fetchDonationStatus();
-    const interval = setInterval(fetchDonationStatus, 15000);
-    return () => clearInterval(interval);
-  }, [streamInfo?.session?.id, playerState]);
+      })
+      .catch(() => setDonationPreset(null));
+  }, [streamInfo?.session?.id, streamInfo?.session?.donation_active, playerState]);
 
   // ── Go Live handler ────────────────────────────
   const goLive = useCallback(() => {
