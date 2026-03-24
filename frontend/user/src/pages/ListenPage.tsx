@@ -235,7 +235,7 @@ export default function ListenPage() {
     return () => clearInterval(poll);
   }, [churchId, playerState, startPlayback]);
 
-  // ── Detect broadcast end while playing ─────────
+  // ── Detect broadcast end while playing + refresh session info ──
   useEffect(() => {
     if (
       playerState !== "playing" &&
@@ -259,6 +259,9 @@ export default function ListenPage() {
           }
           setStreamInfo(data);
           setPlayerState("offline");
+        } else {
+          // Refresh streamInfo to pick up session/donation changes
+          setStreamInfo(data);
         }
       } catch {
         // ignore poll errors
