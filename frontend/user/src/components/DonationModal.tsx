@@ -48,17 +48,20 @@ export default function DonationModal({ open, onClose, sessionId, preset }: Dona
                 </p>
 
                 <div className="grid grid-cols-2 gap-3">
-                    <button
-                        onClick={() => handleDonate(preset.amount_cents)}
-                        disabled={loading}
-                        className="col-span-2 group relative overflow-hidden p-6 bg-primary-600 rounded-3xl text-white shadow-xl shadow-primary-900/40 active:scale-[0.98] transition-all disabled:opacity-50"
-                    >
-                        <div className="flex flex-col items-center">
-                            <span className="text-[10px] uppercase font-black tracking-widest opacity-60 mb-1">Dona</span>
-                            <span className="text-4xl font-black">€ {(preset.amount_cents / 100).toFixed(2).replace('.', ',')}</span>
-                        </div>
-                        <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-                    </button>
+                    {preset.amounts.map((amountCents) => (
+                        <button
+                            key={amountCents}
+                            onClick={() => handleDonate(amountCents)}
+                            disabled={loading}
+                            className="group relative overflow-hidden p-5 bg-primary-600 rounded-3xl text-white shadow-xl shadow-primary-900/40 active:scale-[0.98] transition-all disabled:opacity-50"
+                        >
+                            <div className="flex flex-col items-center">
+                                <span className="text-[10px] uppercase font-black tracking-widest opacity-60 mb-1">Dona</span>
+                                <span className="text-2xl font-black">€ {(amountCents / 100).toFixed(2).replace('.', ',')}</span>
+                            </div>
+                            <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+                        </button>
+                    ))}
 
                     <button
                         onClick={() => setIsCustom(!isCustom)}
