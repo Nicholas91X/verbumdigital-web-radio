@@ -63,6 +63,7 @@ export default function Layout() {
         <TabLink to="/" icon={<HomeIcon />} label="Home" end />
         <TabLink to="/explore" icon={<ExploreIcon />} label="Esplora" />
         <TabLink to="/subscriptions" icon={<HeartIcon />} label="Seguiti" />
+        <TabLink to="/donations" icon={<DonationIcon />} label="Donazioni" />
       </nav>
     </div>
   );
@@ -153,6 +154,14 @@ function HeartIcon() {
         strokeLinejoin="round"
         d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
       />
+    </svg>
+  );
+}
+
+function DonationIcon() {
+  return (
+    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M12 21.593c-5.63-5.539-11-10.297-11-14.402 0-3.791 3.068-5.191 5.281-5.191 1.312 0 4.151.501 5.719 4.457 1.59-3.968 4.464-4.447 5.726-4.447 2.54 0 5.274 1.621 5.274 5.181 0 4.069-5.136 8.625-11 14.402z" />
     </svg>
   );
 }

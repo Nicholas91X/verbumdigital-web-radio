@@ -33,8 +33,10 @@ export default function ListenPage() {
   const [isLive, setIsLive] = useState(true);
   const [pausedAt, setPausedAt] = useState<number | null>(null);
   const [donationPreset, setDonationPreset] = useState<DonationPreset | null>(null);
+  const [donationVisible, setDonationVisible] = useState(false);
   const [donationModalOpen, setDonationModalOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const isPaymentReturnRef = useRef(false);
 
   // ── Fetch stream info ──────────────────────────
   const fetchStream = useCallback(async () => {
@@ -66,9 +68,20 @@ export default function ListenPage() {
       await audio.play();
       retryCountRef.current = 0;
       setPlayerState("playing");
+      isPaymentReturnRef.current = false;
     } catch {
-      // Autoplay blocked — user needs to tap play
-      setPlayerState("paused");
+      // Autoplay blocked — if returning from payment, retry once after interaction hint
+      if (isPaymentReturnRef.current) {
+        // Payment redirect grants autoplay — retry immediately
+        setTimeout(() => {
+          audio.play().then(() => {
+            setPlayerState("playing");
+            isPaymentReturnRef.current = false;
+          }).catch(() => setPlayerState("paused"));
+        }, 800);
+      } else {
+        setPlayerState("paused");
+      }
     }
   }, []);
 
@@ -166,32 +179,16 @@ export default function ListenPage() {
   }, [streamInfo]);
 
   // ── Post-payment return (Stripe redirect) ──────
-  // Detects ?payment=success in URL, shows toast, auto-resumes playback.
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get("payment") !== "success") return;
 
-    // Remove query param from URL without navigation
-    const clean = location.pathname;
-    window.history.replaceState(null, "", clean);
+    window.history.replaceState(null, "", location.pathname);
+    isPaymentReturnRef.current = true;
 
     setToast("Grazie per la tua donazione! 🙏");
     const t = setTimeout(() => setToast(null), 5000);
-
-    // Auto-play: if audio is loaded but paused, resume it
-    const tryPlay = () => {
-      const audio = audioRef.current;
-      if (audio && audio.src && audio.paused) {
-        audio.play().catch(() => {});
-      }
-    };
-    // Slight delay to let initial load complete
-    const pt = setTimeout(tryPlay, 1500);
-
-    return () => {
-      clearTimeout(t);
-      clearTimeout(pt);
-    };
+    return () => clearTimeout(t);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Initial load ───────────────────────────────
@@ -301,6 +298,16 @@ export default function ListenPage() {
 
     return () => clearInterval(poll);
   }, [churchId, playerState]);
+
+  // ── Donation button entrance animation ────────
+  useEffect(() => {
+    if (donationPreset) {
+      const t = setTimeout(() => setDonationVisible(true), 60);
+      return () => clearTimeout(t);
+    } else {
+      setDonationVisible(false);
+    }
+  }, [donationPreset]);
 
   // ── Donation status — driven by streamInfo ────
   // streamInfo is refreshed every 15s by the broadcast poll above.
@@ -576,21 +583,44 @@ export default function ListenPage() {
           {donationPreset && (playerState === "playing" || playerState === "paused" || playerState === "buffering") && (
             <button
               onClick={() => setDonationModalOpen(true)}
-              className="absolute inset-0 flex flex-col items-center justify-center group active:scale-95 transition-transform z-10"
+              className={`absolute inset-0 flex flex-col items-center justify-center group z-10
+                transition-all duration-700 ease-out rounded-full
+                ${donationVisible
+                  ? "opacity-100 scale-100"
+                  : "opacity-0 scale-75 pointer-events-none"
+                }`}
+              style={{
+                background: donationVisible
+                  ? "radial-gradient(ellipse at 40% 35%, rgba(129,140,248,0.18) 0%, rgba(99,102,241,0.08) 60%, transparent 100%)"
+                  : undefined,
+                boxShadow: donationVisible
+                  ? "inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -3px 0 rgba(0,0,0,0.25), 0 8px 32px rgba(99,102,241,0.25)"
+                  : undefined,
+                transform: donationVisible ? "translateY(-2px)" : "translateY(4px)",
+              }}
             >
-              {/* Heart fills the circle */}
+              {/* Heart — 3D layered */}
               <svg
-                className="absolute inset-0 w-full h-full p-6 text-primary-500/30 group-hover:text-primary-500/40 transition-colors"
+                className="absolute inset-0 w-full h-full p-6 text-primary-500/15 transition-colors duration-500"
                 fill="currentColor"
                 viewBox="0 0 24 24"
               >
                 <path d="M12 21.593c-5.63-5.539-11-10.297-11-14.402 0-3.791 3.068-5.191 5.281-5.191 1.312 0 4.151.501 5.719 4.457 1.59-3.968 4.464-4.447 5.726-4.447 2.54 0 5.274 1.621 5.274 5.181 0 4.069-5.136 8.625-11 14.402z" />
               </svg>
-              {/* Overlay: timer + label */}
-              <span className="relative text-2xl font-black tracking-tight text-white drop-shadow">
+              {/* Heart highlight (top-left, lighter) */}
+              <svg
+                className="absolute inset-0 w-full h-full p-6 text-primary-400/25 transition-colors duration-500 group-hover:text-primary-400/35"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+                style={{ clipPath: "polygon(0 0, 60% 0, 40% 60%, 0 80%)" }}
+              >
+                <path d="M12 21.593c-5.63-5.539-11-10.297-11-14.402 0-3.791 3.068-5.191 5.281-5.191 1.312 0 4.151.501 5.719 4.457 1.59-3.968 4.464-4.447 5.726-4.447 2.54 0 5.274 1.621 5.274 5.181 0 4.069-5.136 8.625-11 14.402z" />
+              </svg>
+              {/* Timer + label */}
+              <span className="relative text-2xl font-black tracking-tight text-white drop-shadow-lg">
                 {formatTime(elapsed)}
               </span>
-              <span className="relative text-[9px] font-black uppercase tracking-[0.2em] text-primary-300 mt-1">
+              <span className="relative text-[9px] font-black uppercase tracking-[0.2em] text-primary-300 mt-1 drop-shadow">
                 Dona ora
               </span>
               {/* Pulsing dot */}

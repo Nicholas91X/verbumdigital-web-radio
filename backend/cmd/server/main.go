@@ -193,6 +193,9 @@ func main() {
 			user.GET("/subscriptions", userHandler.GetSubscriptions)
 			user.GET("/stream/:stream_id", userHandler.GetStreamURL)
 
+			// DONATIONS HISTORY
+			user.GET("/donations", donationHandler.GetUserDonations)
+
 			// PUSH NOTIFICATIONS
 			user.POST("/push/subscribe", userHandler.PushSubscribe)
 			user.DELETE("/push/unsubscribe", userHandler.PushUnsubscribe)

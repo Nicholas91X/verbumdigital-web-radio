@@ -6,6 +6,7 @@ import HomePage from '@/pages/HomePage';
 import ExplorePage from '@/pages/ExplorePage';
 import ChurchDetailPage from '@/pages/ChurchDetailPage';
 import SubscriptionsPage from '@/pages/SubscriptionsPage';
+import DonationsPage from '@/pages/DonationsPage';
 import ListenPage from '@/pages/ListenPage';
 import type { ReactNode } from 'react';
 
@@ -44,6 +45,7 @@ export default function App() {
                         <Route path="/explore" element={<ExplorePage />} />
                         <Route path="/churches/:churchId" element={<ChurchDetailPage />} />
                         <Route path="/subscriptions" element={<SubscriptionsPage />} />
+                        <Route path="/donations" element={<DonationsPage />} />
                         <Route path="/listen/:churchId" element={<ListenPage />} />
                     </Route>
 

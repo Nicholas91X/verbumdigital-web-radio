@@ -221,6 +221,17 @@ func (h *DonationHandler) CreateCheckoutSession(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"checkout_url": url})
 }
 
+// GET /user/donations — storico donazioni dell'utente autenticato
+func (h *DonationHandler) GetUserDonations(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	donations, err := h.DonationService.GetUserDonations(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch donations"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"donations": donations})
+}
+
 func (h *DonationHandler) HandleWebhook(c *gin.Context) {
 	payload, err := c.GetRawData()
 	if err != nil {

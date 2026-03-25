@@ -207,6 +207,17 @@ func (s *DonationService) GetDonationStatus(sessionID int32) (map[string]interfa
 	return res, nil
 }
 
+// GET /user/donations
+func (s *DonationService) GetUserDonations(userID int32) ([]models.Donation, error) {
+	var donations []models.Donation
+	err := s.DB.
+		Preload("Church").
+		Where("user_id = ?", userID).
+		Order("created_at DESC").
+		Find(&donations).Error
+	return donations, err
+}
+
 // POST /sessions/:id/donation/checkout
 func (s *DonationService) CreateCheckoutSession(userID *int32, sessionID int32, amountCents int, successURL, cancelURL string) (string, error) {
 	var session models.StreamingSession
