@@ -168,7 +168,9 @@ func (h *DonationHandler) CloseDonation(c *gin.Context) {
 // ============================================
 
 type CheckoutRequest struct {
-	Amount int `json:"amount" binding:"required,min=50"` // minimum Stripe charge is usually 50 cents (0.50 EUR)
+	Amount     int    `json:"amount" binding:"required,min=50"`
+	SuccessURL string `json:"success_url"`
+	CancelURL  string `json:"cancel_url"`
 }
 
 func (h *DonationHandler) GetDonationStatus(c *gin.Context) {
@@ -210,7 +212,7 @@ func (h *DonationHandler) CreateCheckoutSession(c *gin.Context) {
 		}
 	}
 
-	url, err := h.DonationService.CreateCheckoutSession(pUserID, sessionID, req.Amount)
+	url, err := h.DonationService.CreateCheckoutSession(pUserID, sessionID, req.Amount, req.SuccessURL, req.CancelURL)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -208,7 +208,7 @@ func (s *DonationService) GetDonationStatus(sessionID int32) (map[string]interfa
 }
 
 // POST /sessions/:id/donation/checkout
-func (s *DonationService) CreateCheckoutSession(userID *int32, sessionID int32, amountCents int) (string, error) {
+func (s *DonationService) CreateCheckoutSession(userID *int32, sessionID int32, amountCents int, successURL, cancelURL string) (string, error) {
 	var session models.StreamingSession
 	if err := s.DB.Preload("Church").First(&session, sessionID).Error; err != nil {
 		return "", errors.New("session not found")
@@ -222,6 +222,14 @@ func (s *DonationService) CreateCheckoutSession(userID *int32, sessionID int32, 
 		return "", errors.New("church cannot accept donations")
 	}
 
+	// Fall back to AppBaseURL if frontend didn't provide return URLs
+	if successURL == "" {
+		successURL = s.AppBaseURL + "/donation/success"
+	}
+	if cancelURL == "" {
+		cancelURL = s.AppBaseURL + "/donation/cancel"
+	}
+
 	var userEmail string
 	if userID != nil {
 		var user models.User
@@ -231,7 +239,7 @@ func (s *DonationService) CreateCheckoutSession(userID *int32, sessionID int32, 
 	}
 
 	stripe.Key = s.StripeKey
-	
+
 	params := &stripe.CheckoutSessionParams{
 		PaymentMethodTypes: stripe.StringSlice([]string{"card"}),
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
@@ -246,13 +254,18 @@ func (s *DonationService) CreateCheckoutSession(userID *int32, sessionID int32, 
 				Quantity: stripe.Int64(1),
 			},
 		},
-		Mode: stripe.String(string(stripe.CheckoutSessionModePayment)),
-		SuccessURL: stripe.String(s.AppBaseURL + "/donation/success"), // Actually should redirect to User PWA, but backend provides URL. Can be adjusted.
-		CancelURL:  stripe.String(s.AppBaseURL + "/donation/cancel"),
+		Mode:       stripe.String(string(stripe.CheckoutSessionModePayment)),
+		SuccessURL: stripe.String(successURL),
+		CancelURL:  stripe.String(cancelURL),
+		// Destination charge: platform processes the payment,
+		// funds are automatically transferred to the church's connected account.
+		// This ensures platform webhook receives checkout.session.completed.
+		PaymentIntentData: &stripe.CheckoutSessionPaymentIntentDataParams{
+			TransferData: &stripe.CheckoutSessionPaymentIntentDataTransferDataParams{
+				Destination: stripe.String(*session.Church.StripeAccountID),
+			},
+		},
 	}
-
-	// Route the payment to the connected account directly
-	params.SetStripeAccount(*session.Church.StripeAccountID)
 
 	if userEmail != "" {
 		params.CustomerEmail = stripe.String(userEmail)

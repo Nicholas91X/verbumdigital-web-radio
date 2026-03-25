@@ -20,7 +20,9 @@ export default function DonationModal({ open, onClose, sessionId, preset }: Dona
         setLoading(true);
         try {
             const data = await api.post<{ checkout_url: string }>(`/sessions/${sessionId}/donation/checkout`, {
-                amount: amountCents
+                amount: amountCents,
+                success_url: window.location.href + (window.location.search ? '&' : '?') + 'payment=success',
+                cancel_url: window.location.href,
             });
             window.location.href = data.checkout_url;
         } catch (err) {
