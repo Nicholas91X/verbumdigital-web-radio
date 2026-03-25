@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { api } from "@shared/api/client";
 import type { StreamURLResponse, DonationPreset } from "@shared/api/types";
 import DonationModal from "@/components/DonationModal";
@@ -20,6 +20,7 @@ const MAX_RETRY_MS = 15000;
 export default function ListenPage() {
   const { churchId } = useParams<{ churchId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const retryCountRef = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -33,6 +34,7 @@ export default function ListenPage() {
   const [pausedAt, setPausedAt] = useState<number | null>(null);
   const [donationPreset, setDonationPreset] = useState<DonationPreset | null>(null);
   const [donationModalOpen, setDonationModalOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   // ── Fetch stream info ──────────────────────────
   const fetchStream = useCallback(async () => {
@@ -162,6 +164,35 @@ export default function ListenPage() {
       navigator.mediaSession.setActionHandler("pause", null);
     };
   }, [streamInfo]);
+
+  // ── Post-payment return (Stripe redirect) ──────
+  // Detects ?payment=success in URL, shows toast, auto-resumes playback.
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("payment") !== "success") return;
+
+    // Remove query param from URL without navigation
+    const clean = location.pathname;
+    window.history.replaceState(null, "", clean);
+
+    setToast("Grazie per la tua donazione! 🙏");
+    const t = setTimeout(() => setToast(null), 5000);
+
+    // Auto-play: if audio is loaded but paused, resume it
+    const tryPlay = () => {
+      const audio = audioRef.current;
+      if (audio && audio.src && audio.paused) {
+        audio.play().catch(() => {});
+      }
+    };
+    // Slight delay to let initial load complete
+    const pt = setTimeout(tryPlay, 1500);
+
+    return () => {
+      clearTimeout(t);
+      clearTimeout(pt);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Initial load ───────────────────────────────
   useEffect(() => {
@@ -380,6 +411,19 @@ export default function ListenPage() {
           preset={donationPreset}
         />
       )}
+
+      {/* Thank-you toast */}
+      {toast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="flex items-center gap-3 bg-emerald-500/90 backdrop-blur-md text-white px-5 py-3.5 rounded-2xl shadow-2xl shadow-emerald-900/40 border border-white/20">
+            <svg className="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 21.593c-5.63-5.539-11-10.297-11-14.402 0-3.791 3.068-5.191 5.281-5.191 1.312 0 4.151.501 5.719 4.457 1.59-3.968 4.464-4.447 5.726-4.447 2.54 0 5.274 1.621 5.274 5.181 0 4.069-5.136 8.625-11 14.402z" />
+            </svg>
+            <span className="text-sm font-bold">{toast}</span>
+          </div>
+        </div>
+      )}
+
       {/* Background Glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] pointer-events-none opacity-20">
         <div

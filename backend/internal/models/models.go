@@ -211,6 +211,7 @@ type Donation struct {
 	SessionID               *int32    `json:"session_id,omitempty"`
 	Amount                  int       `gorm:"not null" json:"amount"` // in cents
 	Currency                string    `gorm:"size:3;default:'eur'" json:"currency"`
+	DonorEmail              *string   `gorm:"size:255" json:"donor_email,omitempty"`
 	StripePaymentIntentID   *string   `gorm:"size:255" json:"stripe_payment_intent_id,omitempty"`
 	StripeCheckoutSessionID *string   `gorm:"size:255" json:"stripe_checkout_session_id,omitempty"`
 	Status                  string    `gorm:"type:enum('pending','completed','failed');default:'pending'" json:"status"`

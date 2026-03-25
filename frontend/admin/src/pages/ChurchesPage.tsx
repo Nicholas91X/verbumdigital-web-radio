@@ -647,7 +647,7 @@ function ChurchDonationsModal({
                   <div key={d.id} className="bg-surface-900/50 rounded-lg p-3 flex justify-between items-center">
                     <div>
                       <p className="text-sm font-bold text-white">{d.user?.name || "Anonimo"}</p>
-                      <p className="text-xs text-surface-400">{d.user?.email || "Nessuna email"}</p>
+                      <p className="text-xs text-surface-400">{d.user?.email || d.donor_email || "Nessuna email"}</p>
                       <p className="text-[10px] text-surface-500 mt-1">
                         {new Date(d.created_at).toLocaleString("it-IT", {
                           day: "2-digit",

@@ -311,6 +311,13 @@ func (s *DonationService) HandleWebhookEvent(payload []byte, signature string) e
 			if session.PaymentIntent != nil {
 				donation.StripePaymentIntentID = &session.PaymentIntent.ID
 			}
+			// Save donor email from Stripe checkout (works for anonymous donations too)
+			if session.CustomerDetails != nil && session.CustomerDetails.Email != "" {
+				email := session.CustomerDetails.Email
+				donation.DonorEmail = &email
+			} else if session.CustomerEmail != "" {
+				donation.DonorEmail = &session.CustomerEmail
+			}
 			s.DB.Save(&donation)
 		}
 	}
