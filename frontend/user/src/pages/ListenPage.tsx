@@ -505,7 +505,7 @@ export default function ListenPage() {
       {/* Visualizer circle */}
       <div className="relative mb-12 z-20 group">
         <div
-          className={`w-56 h-56 rounded-full flex items-center justify-center transition-all duration-700 relative ${
+          className={`w-56 h-56 rounded-full flex items-center justify-center transition-all duration-700 relative overflow-hidden ${
             playerState === "playing"
               ? "bg-primary-600/10 ring-[12px] ring-primary-600/20 scale-105"
               : playerState === "buffering"
@@ -526,6 +526,35 @@ export default function ListenPage() {
           {/* Buffering ring */}
           {playerState === "buffering" && (
             <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-amber-500 animate-spin" />
+          )}
+
+          {/* Donation CTA — fills the entire circle when active */}
+          {donationPreset && (playerState === "playing" || playerState === "paused" || playerState === "buffering") && (
+            <button
+              onClick={() => setDonationModalOpen(true)}
+              className="absolute inset-0 flex flex-col items-center justify-center group active:scale-95 transition-transform z-10"
+            >
+              {/* Heart fills the circle */}
+              <svg
+                className="absolute inset-0 w-full h-full p-6 text-primary-500/30 group-hover:text-primary-500/40 transition-colors"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path d="M12 21.593c-5.63-5.539-11-10.297-11-14.402 0-3.791 3.068-5.191 5.281-5.191 1.312 0 4.151.501 5.719 4.457 1.59-3.968 4.464-4.447 5.726-4.447 2.54 0 5.274 1.621 5.274 5.181 0 4.069-5.136 8.625-11 14.402z" />
+              </svg>
+              {/* Overlay: timer + label */}
+              <span className="relative text-2xl font-black tracking-tight text-white drop-shadow">
+                {formatTime(elapsed)}
+              </span>
+              <span className="relative text-[9px] font-black uppercase tracking-[0.2em] text-primary-300 mt-1">
+                Dona ora
+              </span>
+              {/* Pulsing dot */}
+              <span className="absolute top-5 right-5 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-primary-500" />
+              </span>
+            </button>
           )}
 
           {/* Content inside circle */}
@@ -644,35 +673,7 @@ export default function ListenPage() {
                   </span>
                 )}
               </div>
-            ) : donationPreset ? (
-              <button
-                onClick={() => setDonationModalOpen(true)}
-                className="flex flex-col items-center gap-3 group active:scale-90 transition-transform"
-              >
-                <span className="text-2xl font-black tracking-tight text-white/70">
-                  {formatTime(elapsed)}
-                </span>
-                <div className="w-10 h-px bg-white/10" />
-                <div className="flex flex-col items-center gap-1.5">
-                  <div className="relative w-11 h-11 rounded-full bg-primary-600/20 border border-primary-500/40 flex items-center justify-center">
-                    <svg
-                      className="w-5 h-5 text-primary-400"
-                      fill="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path d="M12 21.593c-5.63-5.539-11-10.297-11-14.402 0-3.791 3.068-5.191 5.281-5.191 1.312 0 4.151.501 5.719 4.457 1.59-3.968 4.464-4.447 5.726-4.447 2.54 0 5.274 1.621 5.274 5.181 0 4.069-5.136 8.625-11 14.402z" />
-                    </svg>
-                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-primary-500" />
-                    </span>
-                  </div>
-                  <span className="text-[9px] font-black uppercase tracking-[0.2em] text-primary-400">
-                    Dona ora
-                  </span>
-                </div>
-              </button>
-            ) : (
+            ) : donationPreset ? null : (
               <div className="flex flex-col items-center">
                 <span className="text-4xl font-black tracking-tight mb-1">
                   {formatTime(elapsed)}
