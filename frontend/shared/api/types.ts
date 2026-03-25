@@ -131,6 +131,10 @@ export interface Donation {
         name: string;
         email: string;
     };
+    church?: {
+        id: number;
+        name: string;
+    };
 }
 
 // ============================================
