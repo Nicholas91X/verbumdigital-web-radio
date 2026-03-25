@@ -36,6 +36,8 @@ export default function ListenPage() {
   const [donationVisible, setDonationVisible] = useState(false);
   const [donationModalOpen, setDonationModalOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [volume, setVolume] = useState(1);
+  const [muted, setMuted] = useState(false);
   const isPaymentReturnRef = useRef(false);
 
   // ── Fetch stream info ──────────────────────────
@@ -187,7 +189,7 @@ export default function ListenPage() {
     isPaymentReturnRef.current = true;
 
     setToast("Grazie per la tua donazione! 🙏");
-    const t = setTimeout(() => setToast(null), 5000);
+    const t = setTimeout(() => setToast(null), 20000);
     return () => clearTimeout(t);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -332,6 +334,13 @@ export default function ListenPage() {
       })
       .catch(() => setDonationPreset(null));
   }, [streamInfo?.session?.id, streamInfo?.session?.donation_active, playerState]);
+
+  // ── Volume / mute sync ────────────────────────
+  useEffect(() => {
+    if (!audioRef.current) return;
+    audioRef.current.volume = volume;
+    audioRef.current.muted = muted;
+  }, [volume, muted]);
 
   // ── Go Live handler ────────────────────────────
   const goLive = useCallback(() => {
@@ -840,6 +849,43 @@ export default function ListenPage() {
                 </svg>
               )}
             </button>
+
+            {/* Volume control */}
+            <div className="flex items-center gap-3 w-full px-1">
+              <button
+                onClick={() => setMuted((m) => !m)}
+                className="shrink-0 text-surface-400 hover:text-white transition-colors active:scale-90 p-1"
+                title={muted ? "Attiva audio" : "Muto"}
+              >
+                {muted || volume === 0 ? (
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5.586 5.586L18.414 18.414M10 9.172V5.586a1 1 0 00-1.707-.707L5 8H3a1 1 0 00-1 1v6a1 1 0 001 1h2l3.293 3.121A1 1 0 0010 18.414V14.83" />
+                  </svg>
+                ) : volume < 0.5 ? (
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072M10 9.172V5.586a1 1 0 00-1.707-.707L5 8H3a1 1 0 00-1 1v6a1 1 0 001 1h2l3.293 3.121A1 1 0 0010 18.414v-3.657" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M10 9.172V5.586a1 1 0 00-1.707-.707L5 8H3a1 1 0 00-1 1v6a1 1 0 001 1h2l3.293 3.121A1 1 0 0010 18.414v-3.657" />
+                  </svg>
+                )}
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.02}
+                value={muted ? 0 : volume}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value);
+                  setVolume(v);
+                  if (v > 0) setMuted(false);
+                }}
+                className="flex-1 h-1 rounded-full appearance-none cursor-pointer bg-surface-700"
+                style={{ accentColor: "rgb(99 102 241)" }}
+              />
+            </div>
 
             {/* Audio Legend & Action */}
             <div className="flex flex-col items-center gap-6">
