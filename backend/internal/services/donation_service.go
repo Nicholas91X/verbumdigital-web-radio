@@ -292,7 +292,8 @@ func (s *DonationService) CreateCheckoutSession(userID *int32, sessionID int32, 
 
 // POST /stripe/webhook
 func (s *DonationService) HandleWebhookEvent(payload []byte, signature string) error {
-	event, err := webhook.ConstructEvent(payload, signature, s.WebhookSecret)
+	event, err := webhook.ConstructEventWithOptions(payload, signature, s.WebhookSecret,
+		webhook.ConstructEventOptions{IgnoreAPIVersionMismatch: true})
 	if err != nil {
 		return err
 	}
