@@ -190,10 +190,22 @@ function CreatePresetModal({
   onCreated: () => void;
 }) {
   const [name, setName] = useState("");
-  const [amountInput, setAmountInput] = useState("");
+  const [amounts, setAmounts] = useState<string[]>(["", "", ""]);
   const [isDefault, setIsDefault] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const updateAmount = (idx: number, val: string) =>
+    setAmounts((prev) => prev.map((a, i) => (i === idx ? val : a)));
+
+  const addAmount = () => {
+    if (amounts.length < 4) setAmounts((prev) => [...prev, ""]);
+  };
+
+  const removeAmount = (idx: number) => {
+    if (amounts.length <= 1) return;
+    setAmounts((prev) => prev.filter((_, i) => i !== idx));
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -201,60 +213,98 @@ function CreatePresetModal({
     setError("");
 
     try {
-      const amountCents = Math.round(parseFloat(amountInput) * 100);
-      if (isNaN(amountCents) || amountCents <= 0) {
-        throw new Error("L'importo deve essere maggiore di 0");
+      const filled = amounts.filter((a) => a.trim() !== "");
+      if (filled.length === 0) throw new Error("Inserisci almeno un importo");
+
+      const amountsCents = filled.map((a) => Math.round(parseFloat(a) * 100));
+      if (amountsCents.some((v) => isNaN(v) || v < 50)) {
+        throw new Error("Ogni importo deve essere almeno €0,50");
       }
 
       await api.post(`/priest/churches/${churchId}/donation-presets`, {
         name,
-        amounts: [amountCents],
+        amounts: amountsCents,
         is_default: isDefault,
       });
       setName("");
-      setAmountInput("");
+      setAmounts(["", "", ""]);
       setIsDefault(false);
       onCreated();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Errore creazione importo");
+      setError(err instanceof Error ? err.message : "Errore creazione preset");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Nuovo Importo Donazione">
+    <Modal open={open} onClose={onClose} title="Nuovo Preset Donazione">
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
           <div className="bg-red-500/10 text-red-400 p-3 rounded-lg text-sm">
             {error}
           </div>
         )}
-        
+
         <div>
-          <label className="block text-sm text-surface-300 font-medium mb-1.5">Nome</label>
+          <label className="block text-sm text-surface-300 font-medium mb-1.5">Nome preset</label>
           <input
             type="text"
             required
-            placeholder="es. Offerta Standard"
+            placeholder="es. Offerta Santa Messa"
             className="input w-full"
             value={name}
-            onChange={e => setName(e.target.value)}
+            onChange={(e) => setName(e.target.value)}
           />
         </div>
-        
+
         <div>
-          <label className="block text-sm text-surface-300 font-medium mb-1.5">Importo (€)</label>
-          <input
-            type="number"
-            required
-            step="0.01"
-            min="0.50"
-            placeholder="5.00"
-            className="input w-full"
-            value={amountInput}
-            onChange={e => setAmountInput(e.target.value)}
-          />
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm text-surface-300 font-medium">
+              Importi (€) — da 1 a 4 opzioni
+            </label>
+            {amounts.length < 4 && (
+              <button
+                type="button"
+                onClick={addAmount}
+                className="text-xs font-bold text-primary-400 hover:text-primary-300 transition-colors"
+              >
+                + Aggiungi
+              </button>
+            )}
+          </div>
+          <div className="space-y-2">
+            {amounts.map((val, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 font-bold text-sm">€</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.50"
+                    placeholder="0.00"
+                    className="input w-full pl-7"
+                    value={val}
+                    onChange={(e) => updateAmount(idx, e.target.value)}
+                  />
+                </div>
+                {amounts.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeAmount(idx)}
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-surface-500 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          <p className="text-surface-500 text-xs mt-2">
+            Lascia vuoti gli importi che non vuoi usare.
+          </p>
         </div>
 
         <label className="flex items-center gap-3 cursor-pointer py-2">
@@ -268,7 +318,7 @@ function CreatePresetModal({
             <div className="w-10 h-6 bg-surface-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-500"></div>
           </div>
           <span className="text-sm font-medium text-surface-200">
-            Imposta come opzione predefinita
+            Imposta come preset predefinito
           </span>
         </label>
 
