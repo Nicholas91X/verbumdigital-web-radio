@@ -138,7 +138,7 @@ func main() {
 		v1.GET("/stripe/connect/callback", stripeHandler.ConnectCallback)
 		v1.POST("/stripe/webhook", donationHandler.HandleWebhook)
 		v1.GET("/sessions/:id/donation/status", donationHandler.GetDonationStatus)
-		v1.POST("/sessions/:id/donation/checkout", donationHandler.CreateCheckoutSession)
+		v1.POST("/sessions/:id/donation/checkout", middleware.OptionalAuthMiddleware(cfg.JWTSecret), donationHandler.CreateCheckoutSession)
 
 		// ADMIN
 		admin := v1.Group("/admin")

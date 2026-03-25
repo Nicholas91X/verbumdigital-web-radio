@@ -91,6 +91,37 @@ func RequireRole(roles ...string) gin.HandlerFunc {
 	}
 }
 
+// OptionalAuthMiddleware parses JWT if present but does not abort if missing.
+// Sets user_id/email/role in context only when a valid token is provided.
+func OptionalAuthMiddleware(jwtSecret string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.Next()
+			return
+		}
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+			c.Next()
+			return
+		}
+		claims := &Claims{}
+		token, err := jwt.ParseWithClaims(parts[1], claims, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, jwt.ErrSignatureInvalid
+			}
+			return []byte(jwtSecret), nil
+		})
+		if err == nil && token.Valid {
+			c.Set("user_id", claims.UserID)
+			c.Set("email", claims.Email)
+			c.Set("role", claims.Role)
+			c.Set("claims", claims)
+		}
+		c.Next()
+	}
+}
+
 // DeviceAuth validates ST1 device requests via API key
 // Simpler than JWT since devices don't have user sessions
 func DeviceAuth(apiKey string) gin.HandlerFunc {
