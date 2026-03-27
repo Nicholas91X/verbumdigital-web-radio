@@ -629,7 +629,7 @@ export default function ListenPage() {
               <span className="relative text-2xl font-black tracking-tight text-white drop-shadow-lg">
                 {formatTime(elapsed)}
               </span>
-              <span className="relative text-[9px] font-black uppercase tracking-[0.2em] text-primary-300 mt-1 drop-shadow">
+              <span className="relative text-[27px] font-black uppercase tracking-[0.2em] text-primary-300 mt-1 drop-shadow">
                 Dona ora
               </span>
               {/* Pulsing dot */}
