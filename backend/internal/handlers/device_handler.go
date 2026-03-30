@@ -156,7 +156,7 @@ func (h *DeviceHandler) StreamStarted(c *gin.Context) {
 
 	// Trigger push notifications asynchoronously
 	if h.NotificationService != nil {
-		go h.NotificationService.NotifyChurchLive(church.ID, church.Name)
+		go h.NotificationService.NotifyChurchLive(church.ID, church.Name, church.LogoURL)
 	}
 
 	c.JSON(http.StatusOK, gin.H{

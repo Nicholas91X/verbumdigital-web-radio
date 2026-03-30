@@ -118,13 +118,13 @@ self.addEventListener('notificationclick', (event) => {
 
     if (event.action === 'close') return;
 
-    const urlToOpen = event.notification.data.url;
+    const urlToOpen = new URL(event.notification.data.url, self.location.origin).href;
 
     event.waitUntil(
         self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
             // Check if there is already a window open with this URL
             for (let client of windowClients) {
-                if (client.url.includes(urlToOpen) && 'focus' in client) {
+                if (client.url.includes(event.notification.data.url) && 'focus' in client) {
                     return client.focus();
                 }
             }

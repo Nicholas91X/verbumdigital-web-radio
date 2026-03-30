@@ -55,7 +55,7 @@ func (s *NotificationService) RemoveSubscriptionByEndpoint(endpoint string) erro
 }
 
 // NotifyChurchLive sends a push notification to all users subscribed to a church
-func (s *NotificationService) NotifyChurchLive(churchID int32, churchName string) {
+func (s *NotificationService) NotifyChurchLive(churchID int32, churchName string, logoURL string) {
 	// 1. Find all users subscribed to this church with notifications enabled
 	var userIDs []int32
 	s.DB.Model(&models.UserSubscription{}).
@@ -75,12 +75,16 @@ func (s *NotificationService) NotifyChurchLive(churchID int32, churchName string
 	}
 
 	// 3. Prepare notification payload
+	icon := "/pwa-192x192.svg"
+	if logoURL != "" {
+		icon = logoURL
+	}
 	payload, _ := json.Marshal(map[string]interface{}{
 		"title":     "Chiesa in diretta!",
 		"body":      fmt.Sprintf("%s è ora in onda. Ascolta la trasmissione.", churchName),
 		"church_id": churchID,
 		"type":      "live_start",
-		"icon":      "/pwa-192x192.svg",
+		"icon":      icon,
 	})
 
 	// 4. Send notifications concurrently
