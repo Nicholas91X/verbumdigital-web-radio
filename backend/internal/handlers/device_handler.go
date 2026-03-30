@@ -206,6 +206,7 @@ func (h *DeviceHandler) StreamStopped(c *gin.Context) {
 					tx.Model(&session).Updates(map[string]interface{}{
 						"ended_at":         now,
 						"duration_seconds": durationSecs,
+						"donation_active":  false,
 					})
 				}
 			}
@@ -261,6 +262,80 @@ func (h *DeviceHandler) Heartbeat(c *gin.Context) {
 		Update("last_heartbeat", now)
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// ============================================
+// POST /device/donation/open
+// ST1 calls this when the priest opens the donation window.
+// Resolves serial_number → church → current session, sets donation_active = true.
+// ============================================
+
+func (h *DeviceHandler) DonationOpen(c *gin.Context) {
+	var req StreamNotifyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	church, err := h.resolveChurch(req.SerialNumber)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Church not found for this device"})
+		return
+	}
+
+	if !church.StreamingActive || church.CurrentSessionID == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "No active streaming session"})
+		return
+	}
+
+	if err := h.DB.Model(&models.StreamingSession{}).
+		Where("id = ?", *church.CurrentSessionID).
+		Update("donation_active", true).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open donation"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":    true,
+		"session_id": *church.CurrentSessionID,
+	})
+}
+
+// ============================================
+// POST /device/donation/close
+// ST1 calls this when the priest closes the donation window.
+// Resolves serial_number → church → current session, sets donation_active = false.
+// ============================================
+
+func (h *DeviceHandler) DonationClose(c *gin.Context) {
+	var req StreamNotifyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	church, err := h.resolveChurch(req.SerialNumber)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Church not found for this device"})
+		return
+	}
+
+	if !church.StreamingActive || church.CurrentSessionID == nil {
+		c.JSON(http.StatusOK, gin.H{"success": true, "message": "No active session"})
+		return
+	}
+
+	if err := h.DB.Model(&models.StreamingSession{}).
+		Where("id = ?", *church.CurrentSessionID).
+		Update("donation_active", false).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to close donation"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":    true,
+		"session_id": *church.CurrentSessionID,
+	})
 }
 
 // ============================================
