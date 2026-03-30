@@ -292,6 +292,7 @@ function CreateChurchModal({
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
+  const [logoUploading, setLogoUploading] = useState(false);
   const [machineId, setMachineId] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -401,16 +402,8 @@ function CreateChurchModal({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-surface-300 mb-1.5">
-              Logo URL
-            </label>
-            <input
-              type="url"
-              value={logoUrl}
-              onChange={(e) => setLogoUrl(e.target.value)}
-              className="input"
-              placeholder="https://..."
-            />
+            <label className="block text-sm font-medium text-surface-300 mb-1.5">Logo</label>
+            <LogoUploader url={logoUrl} onChange={setLogoUrl} uploading={logoUploading} setUploading={setLogoUploading} />
           </div>
           <div>
             <label className="block text-sm font-medium text-surface-300 mb-1.5">
@@ -463,6 +456,7 @@ function EditChurchModal({
   const [name, setName] = useState(church.name);
   const [address, setAddress] = useState(church.address || "");
   const [logoUrl, setLogoUrl] = useState(church.logo_url || "");
+  const [logoUploading, setLogoUploading] = useState(false);
   const [machineId, setMachineId] = useState(
     church.machine_id?.toString() || "",
   );
@@ -540,15 +534,8 @@ function EditChurchModal({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-surface-300 mb-1.5">
-            Logo URL
-          </label>
-          <input
-            type="url"
-            value={logoUrl}
-            onChange={(e) => setLogoUrl(e.target.value)}
-            className="input"
-          />
+          <label className="block text-sm font-medium text-surface-300 mb-1.5">Logo</label>
+          <LogoUploader url={logoUrl} onChange={setLogoUrl} uploading={logoUploading} setUploading={setLogoUploading} />
         </div>
         <div>
           <label className="block text-sm font-medium text-surface-300 mb-1.5">
@@ -776,5 +763,63 @@ function Loading() {
 function EmptyState({ message }: { message: string }) {
   return (
     <div className="card text-surface-400 text-center py-12">{message}</div>
+  );
+}
+
+// ============================================
+// Logo Uploader Component
+// ============================================
+
+function LogoUploader({
+  url,
+  onChange,
+  uploading,
+  setUploading,
+}: {
+  url: string;
+  onChange: (url: string) => void;
+  uploading: boolean;
+  setUploading: (v: boolean) => void;
+}) {
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const { url: uploaded } = await api.uploadFile<{ url: string }>("/admin/upload/image", fd);
+      onChange(uploaded);
+    } catch {
+      // keep previous url
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-3">
+      {url ? (
+        <img src={url} alt="Logo" className="w-14 h-14 rounded-xl object-cover border border-surface-700 shrink-0" />
+      ) : (
+        <div className="w-14 h-14 rounded-xl bg-surface-800 border border-surface-700 flex items-center justify-center shrink-0">
+          <svg className="w-6 h-6 text-surface-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </div>
+      )}
+      <div className="flex flex-col gap-1.5">
+        <label className={`cursor-pointer px-3 py-1.5 rounded-lg border text-xs font-bold uppercase tracking-widest transition-colors ${uploading ? "opacity-50 pointer-events-none" : ""} bg-surface-800 border-surface-700 text-surface-300 hover:text-white hover:border-surface-600`}>
+          {uploading ? "Caricamento..." : url ? "Cambia" : "Carica Logo"}
+          <input type="file" accept="image/*" className="hidden" onChange={handleFile} disabled={uploading} />
+        </label>
+        {url && (
+          <button type="button" onClick={() => onChange("")} className="text-[10px] text-surface-500 hover:text-red-400 transition-colors font-bold uppercase tracking-widest text-left">
+            Rimuovi
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

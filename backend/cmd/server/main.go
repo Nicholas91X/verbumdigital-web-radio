@@ -95,6 +95,7 @@ func main() {
 	deviceHandler := handlers.NewDeviceHandler(db, cfg.IcecastBaseURL, notificationService)
 	stripeHandler := handlers.NewStripeHandler(stripeService)
 	donationHandler := handlers.NewDonationHandler(donationService)
+	uploadHandler := handlers.NewUploadHandler(cfg.UploadsDir, cfg.AppBaseURL)
 
 	// =====================
 	// ROUTER
@@ -123,6 +124,9 @@ func main() {
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
+
+	// Serve uploaded files publicly (church logos, etc.)
+	r.Static("/uploads", cfg.UploadsDir)
 
 	auth := middleware.AuthMiddleware(cfg.JWTSecret)
 
@@ -154,6 +158,7 @@ func main() {
 			admin.POST("/churches", adminHandler.CreateChurch)
 			admin.PUT("/churches/:id", adminHandler.UpdateChurch)
 			admin.DELETE("/churches/:id", adminHandler.DeleteChurch)
+			admin.POST("/upload/image", uploadHandler.UploadImage)
 			admin.GET("/priests", adminHandler.ListPriests)
 			admin.POST("/priests", adminHandler.CreatePriest)
 			admin.PUT("/priests/:id", adminHandler.UpdatePriest)

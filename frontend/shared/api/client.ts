@@ -108,6 +108,26 @@ class ApiClient {
     delete<T>(path: string, body?: object, requireAuth = true): Promise<T> {
         return this.request<T>('DELETE', path, body, requireAuth);
     }
+
+    async uploadFile<T>(path: string, formData: FormData): Promise<T> {
+        const token = getToken();
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        // No Content-Type — browser sets it with boundary for multipart
+        const response = await fetch(`${this.baseURL}${path}`, {
+            method: 'POST',
+            headers,
+            body: formData,
+        });
+        if (response.status === 401) {
+            clearAuth();
+            window.location.href = '/login';
+            throw new Error('Session expired');
+        }
+        const data = await response.json();
+        if (!response.ok) throw new Error((data as { error: string }).error || `Upload failed: ${response.status}`);
+        return data as T;
+    }
 }
 
 export const api = new ApiClient(API_BASE_URL);

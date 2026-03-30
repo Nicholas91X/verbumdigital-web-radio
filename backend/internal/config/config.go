@@ -38,6 +38,9 @@ type Config struct {
 	StripeSecretKey     string
 	StripeWebhookSecret string
 	AppBaseURL          string
+
+	// File uploads
+	UploadsDir string
 }
 
 func Load() (*Config, error) {
@@ -58,9 +61,10 @@ func Load() (*Config, error) {
 		VAPIDPublicKey:     getEnv("VAPID_PUBLIC_KEY", ""),
 		VAPIDPrivateKey:    getEnv("VAPID_PRIVATE_KEY", ""),
 		VAPIDEmail:         getEnv("VAPID_EMAIL", "admin@verbumdigital.com"),
-		StripeSecretKey:    getEnv("STRIPE_SECRET_KEY", ""),
+		StripeSecretKey:     getEnv("STRIPE_SECRET_KEY", ""),
 		StripeWebhookSecret: getEnv("STRIPE_WEBHOOK_SECRET", ""),
-		AppBaseURL:         getEnv("APP_BASE_URL", "https://api.verbumdigital.it"),
+		AppBaseURL:          getEnv("APP_BASE_URL", "https://api.verbumdigital.it"),
+		UploadsDir:          getEnv("UPLOADS_DIR", "./uploads"),
 	}
 
 	if cfg.DBPassword == "" {
