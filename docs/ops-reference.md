@@ -11,6 +11,7 @@ ssh -i ~/.ssh/id_ed25519_vdserv -p 2200 nicholas@vdserv.com
 ```
 
 **Dati server:**
+
 - Host: `vdserv.com` (IP: 195.201.138.249)
 - Porta SSH: `2200`
 - Utente: `nicholas`
@@ -32,6 +33,8 @@ $env:GOOS="linux"; $env:GOARCH="amd64"; go build -o vd-server ./cmd/server
 ```powershell
 scp -i $env:USERPROFILE\.ssh\id_ed25519_vdserv -P 2200 vd-server nicholas@vdserv.com:/home/nicholas/vd-server-new
 ```
+
+ssh -i $env:USERPROFILE\.ssh\id_ed25519_vdserv -p 2200 nicholas@vdserv.com
 
 ### 3. Sostituisci il binario e riavvia il servizio (sul server)
 
@@ -64,16 +67,17 @@ sudo journalctl -u verbumdigital -n 100 --no-pager
 
 ## Gestione Servizio systemd
 
-| Azione | Comando |
-|--------|---------|
-| Avvia | `sudo systemctl start verbumdigital` |
-| Ferma | `sudo systemctl stop verbumdigital` |
-| Riavvia | `sudo systemctl restart verbumdigital` |
-| Stato | `sudo systemctl status verbumdigital` |
-| Log live | `sudo journalctl -u verbumdigital -f` |
-| Abilita all'avvio | `sudo systemctl enable verbumdigital` |
+| Azione            | Comando                                |
+| ----------------- | -------------------------------------- |
+| Avvia             | `sudo systemctl start verbumdigital`   |
+| Ferma             | `sudo systemctl stop verbumdigital`    |
+| Riavvia           | `sudo systemctl restart verbumdigital` |
+| Stato             | `sudo systemctl status verbumdigital`  |
+| Log live          | `sudo journalctl -u verbumdigital -f`  |
+| Abilita all'avvio | `sudo systemctl enable verbumdigital`  |
 
 **Percorsi importanti sul server:**
+
 - Binario: `/opt/verbumdigital/backend/vd-server`
 - Config `.env`: `/opt/verbumdigital/backend/.env`
 - Definizione servizio: `/etc/systemd/system/verbumdigital.service`
@@ -89,6 +93,7 @@ sudo nano /opt/verbumdigital/backend/.env
 Salva: `Ctrl+O` → `Enter` → `Ctrl+X`
 
 Poi riavvia:
+
 ```bash
 sudo systemctl restart verbumdigital
 ```
@@ -139,6 +144,7 @@ git push
 ```
 
 Vercel builderà e pubblicherà automaticamente tutte e tre le PWA:
+
 - Admin: `https://admin.verbumdigital.it`
 - Priest: `https://priest.verbumdigital.it`
 - User: `https://app.verbumdigital.it`
@@ -174,12 +180,12 @@ curl -X DELETE https://api.stripe.com/v1/webhook_endpoints/we_XXXXX \
 
 ### Carta di test Stripe
 
-| Campo | Valore |
-|-------|--------|
+| Campo        | Valore                |
+| ------------ | --------------------- |
 | Numero carta | `4242 4242 4242 4242` |
-| Scadenza | qualsiasi data futura |
-| CVV | qualsiasi 3 cifre |
-| Nome | qualsiasi |
+| Scadenza     | qualsiasi data futura |
+| CVV          | qualsiasi 3 cifre     |
+| Nome         | qualsiasi             |
 
 ---
 
