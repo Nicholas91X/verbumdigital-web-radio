@@ -149,11 +149,15 @@ func main() {
 			admin.PUT("/machines/:id", adminHandler.UpdateMachine)
 			admin.PUT("/machines/:id/activate", adminHandler.ActivateMachine)
 			admin.PUT("/machines/:id/deactivate", adminHandler.DeactivateMachine)
+			admin.DELETE("/machines/:id", adminHandler.DeleteMachine)
 			admin.GET("/churches", adminHandler.ListChurches)
 			admin.POST("/churches", adminHandler.CreateChurch)
 			admin.PUT("/churches/:id", adminHandler.UpdateChurch)
+			admin.DELETE("/churches/:id", adminHandler.DeleteChurch)
 			admin.GET("/priests", adminHandler.ListPriests)
 			admin.POST("/priests", adminHandler.CreatePriest)
+			admin.PUT("/priests/:id", adminHandler.UpdatePriest)
+			admin.DELETE("/priests/:id", adminHandler.DeletePriest)
 			admin.GET("/sessions", adminHandler.ListSessions)
 
 			// STRIPE ONBOARDING & DONATIONS

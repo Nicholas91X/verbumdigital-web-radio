@@ -50,6 +50,13 @@ type CreatePriestRequest struct {
 	ChurchIDs []int32 `json:"church_ids"`
 }
 
+type UpdatePriestRequest struct {
+	Name      string  `json:"name"`
+	Email     string  `json:"email"`
+	Password  string  `json:"password"`
+	ChurchIDs []int32 `json:"church_ids"`
+}
+
 // ============================================
 // MACHINES
 // ============================================
@@ -226,6 +233,71 @@ func (h *AdminHandler) CreatePriest(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, priest)
+}
+
+func (h *AdminHandler) DeleteMachine(c *gin.Context) {
+	id, err := parseInt32Param(c, "id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return
+	}
+	if err := h.AdminService.DeleteMachine(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (h *AdminHandler) DeleteChurch(c *gin.Context) {
+	id, err := parseInt32Param(c, "id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return
+	}
+	if err := h.AdminService.DeleteChurch(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (h *AdminHandler) UpdatePriest(c *gin.Context) {
+	id, err := parseInt32Param(c, "id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return
+	}
+	var req UpdatePriestRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	priest, err := h.AdminService.UpdatePriest(id, req.Name, req.Email, req.Password, req.ChurchIDs)
+	if err != nil {
+		switch err.Error() {
+		case "priest not found":
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		case "email already registered":
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
+		return
+	}
+	c.JSON(http.StatusOK, priest)
+}
+
+func (h *AdminHandler) DeletePriest(c *gin.Context) {
+	id, err := parseInt32Param(c, "id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return
+	}
+	if err := h.AdminService.DeletePriest(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
 // ============================================

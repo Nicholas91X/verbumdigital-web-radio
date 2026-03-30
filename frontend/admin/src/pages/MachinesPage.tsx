@@ -7,6 +7,9 @@ export default function MachinesPage() {
     const [machines, setMachines] = useState<Machine[]>([]);
     const [loading, setLoading] = useState(true);
     const [showCreate, setShowCreate] = useState(false);
+    const [editMachine, setEditMachine] = useState<Machine | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<Machine | null>(null);
+    const [deleting, setDeleting] = useState(false);
 
     const fetchMachines = useCallback(async () => {
         try {
@@ -31,7 +34,21 @@ export default function MachinesPage() {
             await api.put(endpoint);
             fetchMachines();
         } catch {
-            // could show toast
+            //
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!deleteTarget) return;
+        setDeleting(true);
+        try {
+            await api.delete(`/admin/machines/${deleteTarget.id}`);
+            setDeleteTarget(null);
+            fetchMachines();
+        } catch {
+            //
+        } finally {
+            setDeleting(false);
         }
     };
 
@@ -48,7 +65,6 @@ export default function MachinesPage() {
                 </button>
             </div>
 
-            {/* Table */}
             {loading ? (
                 <Loading />
             ) : machines.length === 0 ? (
@@ -80,7 +96,7 @@ export default function MachinesPage() {
                                                 <span className="badge-warning">Inattiva</span>
                                             )}
                                         </td>
-                                        <td className="table-cell text-right">
+                                        <td className="table-cell text-right space-x-3">
                                             <button
                                                 onClick={() => toggleActivation(m)}
                                                 className={`text-xs font-black uppercase tracking-widest px-3 py-1 transition-colors ${m.activated
@@ -89,6 +105,18 @@ export default function MachinesPage() {
                                                     }`}
                                             >
                                                 {m.activated ? 'Disattiva' : 'Attiva'}
+                                            </button>
+                                            <button
+                                                onClick={() => setEditMachine(m)}
+                                                className="text-xs font-black uppercase tracking-widest text-primary-500 hover:text-primary-400 transition-colors"
+                                            >
+                                                Modifica
+                                            </button>
+                                            <button
+                                                onClick={() => setDeleteTarget(m)}
+                                                className="text-xs font-black uppercase tracking-widest text-red-500/60 hover:text-red-400 transition-colors"
+                                            >
+                                                Elimina
                                             </button>
                                         </td>
                                     </tr>
@@ -122,13 +150,26 @@ export default function MachinesPage() {
                                     </p>
                                 </div>
 
-                                <button
-                                    onClick={() => toggleActivation(m)}
-                                    className={`btn-ghost w-full py-3 text-xs font-black uppercase tracking-widest ${m.activated ? 'text-red-500 hover:bg-red-500/10' : 'text-emerald-500 hover:bg-emerald-500/10'
-                                        }`}
-                                >
-                                    {m.activated ? 'Disattiva Hardware' : 'Attiva Hardware'}
-                                </button>
+                                <div className="flex flex-col gap-1">
+                                    <button
+                                        onClick={() => toggleActivation(m)}
+                                        className={`btn-ghost w-full py-3 text-xs font-black uppercase tracking-widest ${m.activated ? 'text-red-500 hover:bg-red-500/10' : 'text-emerald-500 hover:bg-emerald-500/10'}`}
+                                    >
+                                        {m.activated ? 'Disattiva Hardware' : 'Attiva Hardware'}
+                                    </button>
+                                    <button
+                                        onClick={() => setEditMachine(m)}
+                                        className="btn-ghost w-full py-3 text-xs font-black uppercase tracking-widest text-primary-500"
+                                    >
+                                        Modifica
+                                    </button>
+                                    <button
+                                        onClick={() => setDeleteTarget(m)}
+                                        className="btn-ghost w-full py-3 text-xs font-black uppercase tracking-widest text-red-500/70 hover:bg-red-500/10"
+                                    >
+                                        Elimina
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -139,11 +180,39 @@ export default function MachinesPage() {
             <CreateMachineModal
                 open={showCreate}
                 onClose={() => setShowCreate(false)}
-                onCreated={() => {
-                    setShowCreate(false);
-                    fetchMachines();
-                }}
+                onCreated={() => { setShowCreate(false); fetchMachines(); }}
             />
+
+            {/* Edit Modal */}
+            {editMachine && (
+                <EditMachineModal
+                    machine={editMachine}
+                    onClose={() => setEditMachine(null)}
+                    onSaved={() => { setEditMachine(null); fetchMachines(); }}
+                />
+            )}
+
+            {/* Delete Confirm Modal */}
+            <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Elimina Macchina">
+                <div className="space-y-4">
+                    <p className="text-surface-300 text-sm">
+                        Sei sicuro di voler eliminare la macchina <span className="font-bold text-white font-mono">{deleteTarget?.machine_id}</span>?
+                        {deleteTarget?.church && (
+                            <span className="block mt-1 text-amber-400">⚠ Verrà scollegata dalla chiesa <strong>{deleteTarget.church.name}</strong>.</span>
+                        )}
+                    </p>
+                    <div className="flex gap-3 justify-end">
+                        <button onClick={() => setDeleteTarget(null)} className="btn-ghost">Annulla</button>
+                        <button
+                            onClick={handleDelete}
+                            disabled={deleting}
+                            className="px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-bold hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                        >
+                            {deleting ? 'Eliminazione...' : 'Elimina'}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 }
@@ -152,15 +221,7 @@ export default function MachinesPage() {
 // Create Machine Modal
 // ============================================
 
-function CreateMachineModal({
-    open,
-    onClose,
-    onCreated,
-}: {
-    open: boolean;
-    onClose: () => void;
-    onCreated: () => void;
-}) {
+function CreateMachineModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
     const [machineId, setMachineId] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -171,10 +232,8 @@ function CreateMachineModal({
         setError('');
         setLoading(true);
         try {
-            const data = await api.post<{ machine: Machine }>('/admin/machines', {
-                machine_id: machineId,
-            });
-            setCreated(data.machine);
+            const data = await api.post<Machine>('/admin/machines', { machine_id: machineId });
+            setCreated(data);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Errore creazione');
         } finally {
@@ -185,9 +244,7 @@ function CreateMachineModal({
     const handleClose = () => {
         setMachineId('');
         setError('');
-        setCreated(null);
-        if (created) onCreated();
-        else onClose();
+        if (created) { setCreated(null); onCreated(); } else onClose();
     };
 
     return (
@@ -205,38 +262,19 @@ function CreateMachineModal({
                         </p>
                     </div>
                     <p className="text-xs text-surface-500">Comunica il codice di attivazione a Svilen per la configurazione del device.</p>
-                    <button onClick={handleClose} className="btn-primary w-full">
-                        Chiudi
-                    </button>
+                    <button onClick={handleClose} className="btn-primary w-full">Chiudi</button>
                 </div>
             ) : (
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    {error && (
-                        <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-red-400 text-sm">
-                            {error}
-                        </div>
-                    )}
+                    {error && <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-red-400 text-sm">{error}</div>}
                     <div>
-                        <label className="block text-sm font-medium text-surface-300 mb-1.5">
-                            Machine ID
-                        </label>
-                        <input
-                            type="text"
-                            value={machineId}
-                            onChange={(e) => setMachineId(e.target.value)}
-                            className="input"
-                            placeholder="SMIX-12345"
-                            required
-                        />
+                        <label className="block text-sm font-medium text-surface-300 mb-1.5">Machine ID</label>
+                        <input type="text" value={machineId} onChange={(e) => setMachineId(e.target.value)} className="input" placeholder="SMIX-12345" required />
                         <p className="text-xs text-surface-500 mt-1">Identificativo univoco della scheda ST1</p>
                     </div>
                     <div className="flex gap-3 justify-end">
-                        <button type="button" onClick={handleClose} className="btn-ghost">
-                            Annulla
-                        </button>
-                        <button type="submit" disabled={loading} className="btn-primary">
-                            {loading ? 'Creazione...' : 'Crea'}
-                        </button>
+                        <button type="button" onClick={handleClose} className="btn-ghost">Annulla</button>
+                        <button type="submit" disabled={loading} className="btn-primary">{loading ? 'Creazione...' : 'Crea'}</button>
                     </div>
                 </form>
             )}
@@ -245,8 +283,44 @@ function CreateMachineModal({
 }
 
 // ============================================
-// Shared helpers
+// Edit Machine Modal
 // ============================================
+
+function EditMachineModal({ machine, onClose, onSaved }: { machine: Machine; onClose: () => void; onSaved: () => void }) {
+    const [machineId, setMachineId] = useState(machine.machine_id);
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const handleSubmit = async (e: FormEvent) => {
+        e.preventDefault();
+        setError('');
+        setLoading(true);
+        try {
+            await api.put(`/admin/machines/${machine.id}`, { machine_id: machineId });
+            onSaved();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Errore aggiornamento');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Modal open onClose={onClose} title="Modifica Macchina">
+            <form onSubmit={handleSubmit} className="space-y-4">
+                {error && <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-red-400 text-sm">{error}</div>}
+                <div>
+                    <label className="block text-sm font-medium text-surface-300 mb-1.5">Machine ID</label>
+                    <input type="text" value={machineId} onChange={(e) => setMachineId(e.target.value)} className="input" required />
+                </div>
+                <div className="flex gap-3 justify-end">
+                    <button type="button" onClick={onClose} className="btn-ghost">Annulla</button>
+                    <button type="submit" disabled={loading} className="btn-primary">{loading ? 'Salvataggio...' : 'Salva'}</button>
+                </div>
+            </form>
+        </Modal>
+    );
+}
 
 function Loading() {
     return (

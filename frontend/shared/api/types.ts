@@ -46,13 +46,7 @@ export interface Priest {
     email: string;
     created_at: string;
     updated_at: string;
-    churches?: PriestChurch[];
-}
-
-export interface PriestChurch {
-    priest_id: number;
-    church_id: number;
-    church?: Church;
+    churches?: Church[];
 }
 
 export interface User {

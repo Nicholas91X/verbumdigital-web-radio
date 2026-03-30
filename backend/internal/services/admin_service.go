@@ -288,6 +288,94 @@ func (s *AdminService) CreatePriest(name, email, password string, churchIDs []in
 	return &priest, nil
 }
 
+func (s *AdminService) DeleteMachine(id int32) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		// Unlink church that references this machine
+		if err := tx.Model(&models.Church{}).Where("machine_id = ?", id).Update("machine_id", nil).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&models.Machine{}, id).Error
+	})
+}
+
+func (s *AdminService) DeleteChurch(id int32) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		// Reset streaming state first
+		tx.Model(&models.Church{}).Where("id = ?", id).Updates(map[string]interface{}{
+			"streaming_active":   false,
+			"current_session_id": nil,
+		})
+		// Delete in dependency order
+		tx.Where("church_id = ?", id).Delete(&models.Donation{})
+		tx.Where("church_id = ?", id).Delete(&models.DonationPreset{})
+		tx.Where("church_id = ?", id).Delete(&models.ActiveListener{})
+		tx.Where("church_id = ?", id).Delete(&models.UserSubscription{})
+		tx.Where("church_id = ?", id).Delete(&models.PriestChurch{})
+		tx.Where("church_id = ?", id).Delete(&models.StreamingSession{})
+		tx.Where("church_id = ?", id).Delete(&models.StreamingCredential{})
+		return tx.Delete(&models.Church{}, id).Error
+	})
+}
+
+func (s *AdminService) UpdatePriest(id int32, name, email, password string, churchIDs []int32) (*models.Priest, error) {
+	var priest models.Priest
+	if err := s.DB.First(&priest, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("priest not found")
+		}
+		return nil, err
+	}
+
+	err := s.DB.Transaction(func(tx *gorm.DB) error {
+		if name != "" {
+			priest.Name = name
+		}
+		if email != "" && email != priest.Email {
+			var count int64
+			tx.Model(&models.Priest{}).Where("email = ? AND id != ?", email, id).Count(&count)
+			if count > 0 {
+				return errors.New("email already registered")
+			}
+			priest.Email = email
+		}
+		if password != "" {
+			hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+			if err != nil {
+				return err
+			}
+			priest.PasswordHash = string(hash)
+		}
+		if err := tx.Save(&priest).Error; err != nil {
+			return err
+		}
+		// Replace church assignments
+		if err := tx.Where("priest_id = ?", id).Delete(&models.PriestChurch{}).Error; err != nil {
+			return err
+		}
+		for _, churchID := range churchIDs {
+			pc := models.PriestChurch{PriestID: priest.ID, ChurchID: churchID, Role: "owner"}
+			if err := tx.Create(&pc).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	s.DB.Preload("Churches").First(&priest, id)
+	return &priest, nil
+}
+
+func (s *AdminService) DeletePriest(id int32) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("priest_id = ?", id).Delete(&models.PriestChurch{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&models.Priest{}, id).Error
+	})
+}
+
 // ============================================
 // SESSIONS (read-only overview)
 // ============================================

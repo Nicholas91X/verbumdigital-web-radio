@@ -10,6 +10,8 @@ export default function ChurchesPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [editChurch, setEditChurch] = useState<Church | null>(null);
   const [donationsChurch, setDonationsChurch] = useState<Church | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Church | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -29,6 +31,20 @@ export default function ChurchesPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/admin/churches/${deleteTarget.id}`);
+      setDeleteTarget(null);
+      fetchData();
+    } catch {
+      //
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   // Machines not yet assigned to a church
   const availableMachines = machines.filter(
@@ -98,6 +114,12 @@ export default function ChurchesPage() {
                       >
                         Modifica
                       </button>
+                      <button
+                        onClick={() => setDeleteTarget(c)}
+                        className="ml-3 text-xs font-bold text-red-500/60 hover:text-red-400 uppercase tracking-widest"
+                      >
+                        Elimina
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -158,6 +180,12 @@ export default function ChurchesPage() {
                     className="btn-ghost w-full py-3 text-xs font-bold uppercase tracking-widest"
                   >
                     Modifica Dettagli
+                  </button>
+                  <button
+                    onClick={() => setDeleteTarget(c)}
+                    className="btn-ghost w-full py-3 text-xs font-bold uppercase tracking-widest text-red-500/70 hover:bg-red-500/10"
+                  >
+                    Elimina Chiesa
                   </button>
                 </div>
               </div>
@@ -220,6 +248,28 @@ export default function ChurchesPage() {
           onClose={() => setDonationsChurch(null)}
         />
       )}
+
+      {/* Delete Confirm Modal */}
+      <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Elimina Chiesa">
+        <div className="space-y-4">
+          <p className="text-surface-300 text-sm">
+            Sei sicuro di voler eliminare la chiesa <span className="font-bold text-white">{deleteTarget?.name}</span>?
+            <span className="block mt-2 text-red-400/80 text-xs">
+              ⚠ Questa operazione è irreversibile. Verranno eliminati: credenziali streaming, sessioni, donazioni, presets, iscrizioni utenti e assegnazioni sacerdoti.
+            </span>
+          </p>
+          <div className="flex gap-3 justify-end">
+            <button onClick={() => setDeleteTarget(null)} className="btn-ghost">Annulla</button>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-bold hover:bg-red-500/20 transition-colors disabled:opacity-50"
+            >
+              {deleting ? 'Eliminazione...' : 'Elimina'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
