@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '@shared/api/client';
 import type { SubscriptionEntry } from '@shared/api/types';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 interface ChurchDetail {
     id: number;
@@ -15,6 +16,7 @@ interface ChurchDetail {
 export default function ChurchDetailPage() {
     const { churchId } = useParams<{ churchId: string }>();
     const navigate = useNavigate();
+    const { isSubscribed: isPushSubscribed, subscribe: subscribePush } = usePushNotifications();
 
     const [church, setChurch] = useState<ChurchDetail | null>(null);
     const [subscription, setSubscription] = useState<SubscriptionEntry | null>(null);
@@ -72,8 +74,16 @@ export default function ChurchDetailPage() {
         if (!subscription) return;
         setActionLoading(true);
         try {
+            const enabling = !subscription.notifications_enabled;
+
+            // If enabling, ensure the browser push subscription is registered
+            if (enabling && !isPushSubscribed) {
+                const ok = await subscribePush();
+                if (!ok) return; // permission denied or error
+            }
+
             await api.put(`/user/churches/${churchId}/notifications`, {
-                enabled: !subscription.notifications_enabled,
+                enabled: enabling,
             });
             fetchData();
         } catch {
