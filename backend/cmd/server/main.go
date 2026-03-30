@@ -209,6 +209,8 @@ func main() {
 			device.POST("/stream/started", deviceHandler.StreamStarted)
 			device.POST("/stream/stopped", deviceHandler.StreamStopped)
 			device.POST("/heartbeat", deviceHandler.Heartbeat)
+			device.POST("/donation/open", deviceHandler.DonationOpen)
+			device.POST("/donation/close", deviceHandler.DonationClose)
 		}
 	}
 
