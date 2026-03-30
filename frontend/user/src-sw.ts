@@ -122,16 +122,13 @@ self.addEventListener('notificationclick', (event) => {
 
     event.waitUntil(
         self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-            // Check if there is already a window open with this URL
-            for (let client of windowClients) {
-                if (client.url.includes(event.notification.data.url) && 'focus' in client) {
-                    return client.focus();
-                }
+            // If app is already open, navigate it to the target URL
+            if (windowClients.length > 0) {
+                const client = windowClients[0] as WindowClient;
+                return client.navigate(urlToOpen).then((c) => c && c.focus());
             }
-            // If not, open a new window
-            if (self.clients.openWindow) {
-                return self.clients.openWindow(urlToOpen);
-            }
+            // Otherwise open a new window
+            return self.clients.openWindow(urlToOpen);
         })
     );
 });
