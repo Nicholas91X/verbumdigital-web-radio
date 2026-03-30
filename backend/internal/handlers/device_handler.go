@@ -288,9 +288,19 @@ func (h *DeviceHandler) DonationOpen(c *gin.Context) {
 		return
 	}
 
+	// Load the default preset for this church
+	var preset models.DonationPreset
+	if err := h.DB.Where("church_id = ? AND is_default = ?", church.ID, true).First(&preset).Error; err != nil {
+		c.JSON(http.StatusPreconditionFailed, gin.H{"error": "No default donation preset configured for this church"})
+		return
+	}
+
 	if err := h.DB.Model(&models.StreamingSession{}).
 		Where("id = ?", *church.CurrentSessionID).
-		Update("donation_active", true).Error; err != nil {
+		Updates(map[string]interface{}{
+			"donation_active":    true,
+			"donation_preset_id": preset.ID,
+		}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open donation"})
 		return
 	}
@@ -298,6 +308,7 @@ func (h *DeviceHandler) DonationOpen(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success":    true,
 		"session_id": *church.CurrentSessionID,
+		"preset_id":  preset.ID,
 	})
 }
 
