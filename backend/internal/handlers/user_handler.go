@@ -276,69 +276,44 @@ func (h *UserHandler) PushUnsubscribe(c *gin.Context) {
 }
 
 // ============================================
-// POST /listener/heartbeat
-// Called every 30s while user is listening.
-// Creates or updates an ActiveListener record.
+// POST /listener/report
+// Called when user stops listening.
+// Creates an ActiveListener record with total time.
 // ============================================
 
-type ListenerHeartbeatRequest struct {
-	SessionID int32 `json:"session_id" binding:"required"`
+type ListenerReportRequest struct {
+	SessionID       int32 `json:"session_id" binding:"required"`
+	ListenedSeconds int   `json:"listened_seconds" binding:"required"`
 }
 
-func (h *UserHandler) ListenerHeartbeat(c *gin.Context) {
+func (h *UserHandler) ListenerReport(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 
-	var req ListenerHeartbeatRequest
+	var req ListenerReportRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.ListenedSeconds <= 0 {
+		c.JSON(http.StatusOK, gin.H{"success": true})
 		return
 	}
 
 	now := time.Now()
-	var listener models.ActiveListener
-	err := h.DB.Where("session_id = ? AND user_id = ?", req.SessionID, userID).First(&listener).Error
+	connectedAt := now.Add(-time.Duration(req.ListenedSeconds) * time.Second)
 
-	if err != nil {
-		// Create new
-		listener = models.ActiveListener{
-			SessionID:     req.SessionID,
-			UserID:        &userID,
-			ConnectedAt:   now,
-			LastHeartbeat: now,
-		}
-		h.DB.Create(&listener)
-	} else {
-		// Update heartbeat
-		h.DB.Model(&listener).Update("last_heartbeat", now)
+	listener := models.ActiveListener{
+		SessionID:     req.SessionID,
+		UserID:        &userID,
+		ConnectedAt:   connectedAt,
+		LastHeartbeat: now,
 	}
 
-	// Update max_listener_count on the session
-	var count int64
-	h.DB.Model(&models.ActiveListener{}).Where("session_id = ?", req.SessionID).Count(&count)
-	h.DB.Model(&models.StreamingSession{}).Where("id = ? AND max_listener_count < ?", req.SessionID, count).
-		Update("max_listener_count", count)
-
-	c.JSON(http.StatusOK, gin.H{"success": true, "listener_count": count})
-}
-
-// ============================================
-// DELETE /listener/disconnect
-// Called when user leaves the listen page.
-// ============================================
-
-func (h *UserHandler) ListenerDisconnect(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-
-	var req ListenerHeartbeatRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := h.DB.Create(&listener).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save listener report"})
 		return
 	}
-
-	// Keep the record (for metrics) but mark final heartbeat
-	h.DB.Model(&models.ActiveListener{}).
-		Where("session_id = ? AND user_id = ?", req.SessionID, userID).
-		Update("last_heartbeat", time.Now())
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }

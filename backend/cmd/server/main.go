@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strconv"
@@ -208,8 +209,7 @@ func main() {
 			user.GET("/donations", donationHandler.GetUserDonations)
 
 			// LISTENER TRACKING
-			user.POST("/listener/heartbeat", userHandler.ListenerHeartbeat)
-			user.DELETE("/listener/disconnect", userHandler.ListenerDisconnect)
+			user.POST("/listener/report", userHandler.ListenerReport)
 
 			// PUSH NOTIFICATIONS
 			user.POST("/push/subscribe", userHandler.PushSubscribe)
@@ -272,6 +272,10 @@ func main() {
 			}
 		}
 	}()
+
+	// ICECAST POLLER
+	icecastPoller := services.NewIcecastPoller(db, cfg.IcecastBaseURL)
+	go icecastPoller.Start(context.Background())
 
 	addr := fmt.Sprintf(":%s", cfg.Port)
 	log.Printf("Server starting on %s", addr)
