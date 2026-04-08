@@ -331,11 +331,9 @@ export default function UsersPage() {
                                 </button>
                             </div>
 
-                            {/* LIST / GRID VIEW */}
-                            <div className={`
-                                ${viewMode === 'table' ? 'hidden lg:block card p-0 overflow-hidden' : 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'}
-                            `}>
-                                {viewMode === 'table' ? (
+                            {/* DESKTOP TABLE */}
+                            {viewMode === 'table' && (
+                                <div className="hidden lg:block card p-0 overflow-hidden">
                                     <table className="w-full">
                                         <thead className="bg-surface-900/50">
                                             <tr>
@@ -398,9 +396,16 @@ export default function UsersPage() {
                                             ))}
                                         </tbody>
                                     </table>
-                                ) : (
-                                    paginated.map((u) => (
-                                        <div key={u.id} className="card p-5 space-y-4 hover:border-white/20 cursor-pointer active:scale-[0.98] transition-all" onClick={() => setSelectedUser(u)}>
+                                </div>
+                            )}
+
+                            {/* MOBILE LIST / DESKTOP GRID VIEW */}
+                            <div className={`
+                                grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 
+                                ${viewMode === 'table' ? 'lg:hidden' : ''}
+                            `}>
+                                {paginated.map((u) => (
+                                    <div key={u.id} className="card p-5 space-y-4 hover:border-white/20 cursor-pointer active:scale-[0.98] transition-all" onClick={() => setSelectedUser(u)}>
                                             <div className="flex justify-between items-start">
                                                 <div className="min-w-0 pr-4">
                                                     <h3 className="font-extrabold text-white text-lg truncate">{u.name}</h3>
@@ -445,8 +450,7 @@ export default function UsersPage() {
                                                 </div>
                                             </div>
                                         </div>
-                                    ))
-                                )}
+                                ))}
                             </div>
 
                             {/* PAGINATION */}
