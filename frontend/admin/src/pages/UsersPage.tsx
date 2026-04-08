@@ -525,7 +525,7 @@ export default function UsersPage() {
                                 }} 
                                 className="w-full btn-danger"
                             >
-                                Cortocircuita Profilo (Elimina)
+                                Elimina Profilo
                             </button>
                         </div>
                     </div>
