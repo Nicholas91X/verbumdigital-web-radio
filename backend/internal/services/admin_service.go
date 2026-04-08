@@ -377,10 +377,73 @@ func (s *AdminService) DeletePriest(id int32) error {
 }
 
 // ============================================
+// USERS
+// ============================================
+
+type UserWithMetrics struct {
+	models.User
+	SubscriptionCount int64  `json:"subscription_count"`
+	DonationCount     int64  `json:"donation_count"`
+	DonationTotal     int64  `json:"donation_total"` // cents
+	ListeningMinutes  int64  `json:"listening_minutes"`
+}
+
+func (s *AdminService) ListUsers() ([]UserWithMetrics, error) {
+	var users []models.User
+	if err := s.DB.Order("created_at DESC").Find(&users).Error; err != nil {
+		return nil, err
+	}
+
+	result := make([]UserWithMetrics, len(users))
+	for i, u := range users {
+		var subCount int64
+		s.DB.Model(&models.UserSubscription{}).Where("user_id = ?", u.ID).Count(&subCount)
+
+		var donCount int64
+		s.DB.Model(&models.Donation{}).Where("user_id = ? AND status = 'completed'", u.ID).Count(&donCount)
+
+		var donTotal int64
+		s.DB.Model(&models.Donation{}).Where("user_id = ? AND status = 'completed'", u.ID).
+			Select("COALESCE(SUM(amount), 0)").Scan(&donTotal)
+
+		// Listening time: sum of seconds from active_listeners
+		var listenSecs int64
+		s.DB.Model(&models.ActiveListener{}).Where("user_id = ?", u.ID).
+			Select("COALESCE(SUM(TIMESTAMPDIFF(SECOND, connected_at, last_heartbeat)), 0)").Scan(&listenSecs)
+
+		result[i] = UserWithMetrics{
+			User:              u,
+			SubscriptionCount: subCount,
+			DonationCount:     donCount,
+			DonationTotal:     donTotal,
+			ListeningMinutes:  listenSecs / 60,
+		}
+	}
+	return result, nil
+}
+
+func (s *AdminService) DeleteUser(id int32) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		tx.Where("user_id = ?", id).Delete(&models.Donation{})
+		tx.Where("user_id = ?", id).Delete(&models.ActiveListener{})
+		tx.Where("user_id = ?", id).Delete(&models.UserSubscription{})
+		tx.Where("user_id = ?", id).Delete(&models.PushSubscription{})
+		return tx.Delete(&models.User{}, id).Error
+	})
+}
+
+// ============================================
 // SESSIONS (read-only overview)
 // ============================================
 
-func (s *AdminService) ListSessions(limit int) ([]models.StreamingSession, error) {
+type SessionWithMetrics struct {
+	models.StreamingSession
+	ListenerCount    int64 `json:"listener_count"`
+	TotalListenSecs  int64 `json:"total_listen_secs"`
+	BandwidthMB      float64 `json:"bandwidth_mb"`
+}
+
+func (s *AdminService) ListSessions(limit int) ([]SessionWithMetrics, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
@@ -392,8 +455,31 @@ func (s *AdminService) ListSessions(limit int) ([]models.StreamingSession, error
 		Order("started_at DESC").
 		Limit(limit).
 		Find(&sessions).Error
+	if err != nil {
+		return nil, err
+	}
 
-	return sessions, err
+	result := make([]SessionWithMetrics, len(sessions))
+	for i, sess := range sessions {
+		var listenerCount int64
+		s.DB.Model(&models.ActiveListener{}).Where("session_id = ?", sess.ID).Count(&listenerCount)
+
+		var totalSecs int64
+		s.DB.Model(&models.ActiveListener{}).Where("session_id = ?", sess.ID).
+			Select("COALESCE(SUM(TIMESTAMPDIFF(SECOND, connected_at, last_heartbeat)), 0)").Scan(&totalSecs)
+
+		// 128 kbps = 16 KB/s per listener
+		bandwidthMB := float64(totalSecs) * 16.0 / 1024.0
+
+		result[i] = SessionWithMetrics{
+			StreamingSession: sess,
+			ListenerCount:    listenerCount,
+			TotalListenSecs:  totalSecs,
+			BandwidthMB:      bandwidthMB,
+		}
+	}
+
+	return result, nil
 }
 
 // ============================================

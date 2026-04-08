@@ -335,6 +335,25 @@ export default function ListenPage() {
       .catch(() => setDonationPreset(null));
   }, [streamInfo?.session?.id, streamInfo?.session?.donation_active, playerState]);
 
+  // ── Listener heartbeat (every 30s while playing) ─
+  useEffect(() => {
+    const sessionId = streamInfo?.session?.id;
+    if (playerState !== "playing" || !sessionId) return;
+
+    // Send immediately on start
+    api.post("/user/listener/heartbeat", { session_id: sessionId }).catch(() => {});
+
+    const interval = setInterval(() => {
+      api.post("/user/listener/heartbeat", { session_id: sessionId }).catch(() => {});
+    }, 30000);
+
+    return () => {
+      clearInterval(interval);
+      // Notify disconnect on cleanup
+      api.delete("/user/listener/disconnect", { session_id: sessionId }).catch(() => {});
+    };
+  }, [playerState, streamInfo?.session?.id]);
+
   // ── Volume / mute sync ────────────────────────
   useEffect(() => {
     if (!audioRef.current) return;

@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
 import { api } from '@shared/api/client';
-import type { StreamingSession } from '@shared/api/types';
+import type { SessionWithMetrics } from '@shared/api/types';
 
 export default function SessionsPage() {
-    const [sessions, setSessions] = useState<StreamingSession[]>([]);
+    const [sessions, setSessions] = useState<SessionWithMetrics[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetch = async () => {
             try {
-                const data = await api.get<{ sessions: StreamingSession[] }>('/admin/sessions?limit=50');
+                const data = await api.get<{ sessions: SessionWithMetrics[] }>('/admin/sessions?limit=50');
                 setSessions(data.sessions || []);
             } catch {
                 //
@@ -51,6 +51,8 @@ export default function SessionsPage() {
                                     <th className="table-header">Fine</th>
                                     <th className="table-header">Durata</th>
                                     <th className="table-header">Ascoltatori</th>
+                                    <th className="table-header">Ascolto tot.</th>
+                                    <th className="table-header">Banda</th>
                                     <th className="table-header">Stato</th>
                                 </tr>
                             </thead>
@@ -81,7 +83,13 @@ export default function SessionsPage() {
                                                 {s.duration_seconds ? formatDuration(s.duration_seconds) : '—'}
                                             </td>
                                             <td className="table-cell text-surface-400 text-center font-bold">
-                                                {s.max_listener_count > 0 ? s.max_listener_count : '—'}
+                                                {s.listener_count > 0 ? s.listener_count : (s.max_listener_count > 0 ? s.max_listener_count : '—')}
+                                            </td>
+                                            <td className="table-cell font-mono text-surface-400 text-xs">
+                                                {s.total_listen_secs > 0 ? formatDuration(s.total_listen_secs) : '—'}
+                                            </td>
+                                            <td className="table-cell font-mono text-surface-400 text-xs">
+                                                {s.bandwidth_mb > 0 ? `${s.bandwidth_mb.toFixed(1)} MB` : '—'}
                                             </td>
                                             <td className="table-cell">
                                                 {isLive ? (
@@ -129,12 +137,28 @@ export default function SessionsPage() {
                                             </p>
                                         </div>
                                         <div className="space-y-1">
-                                            <span className="text-[10px] text-surface-500 font-bold uppercase tracking-widest">Durata / Peak</span>
+                                            <span className="text-[10px] text-surface-500 font-bold uppercase tracking-widest">Durata / Ascoltatori</span>
                                             <p className="text-xs font-mono text-surface-300">
-                                                {s.duration_seconds ? formatDuration(s.duration_seconds) : '—'} / {s.max_listener_count} usr
+                                                {s.duration_seconds ? formatDuration(s.duration_seconds) : '—'} / {s.listener_count > 0 ? s.listener_count : s.max_listener_count} usr
                                             </p>
                                         </div>
                                     </div>
+                                    {(s.total_listen_secs > 0 || s.bandwidth_mb > 0) && (
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] text-surface-500 font-bold uppercase tracking-widest">Ascolto totale</span>
+                                                <p className="text-xs font-mono text-surface-300">
+                                                    {s.total_listen_secs > 0 ? formatDuration(s.total_listen_secs) : '—'}
+                                                </p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] text-surface-500 font-bold uppercase tracking-widest">Banda</span>
+                                                <p className="text-xs font-mono text-surface-300">
+                                                    {s.bandwidth_mb > 0 ? `${s.bandwidth_mb.toFixed(1)} MB` : '—'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )
                         })}

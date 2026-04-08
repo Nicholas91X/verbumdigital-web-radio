@@ -301,6 +301,32 @@ func (h *AdminHandler) DeletePriest(c *gin.Context) {
 }
 
 // ============================================
+// USERS
+// ============================================
+
+func (h *AdminHandler) ListUsers(c *gin.Context) {
+	users, err := h.AdminService.ListUsers()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch users"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"users": users})
+}
+
+func (h *AdminHandler) DeleteUser(c *gin.Context) {
+	id, err := parseInt32Param(c, "id")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return
+	}
+	if err := h.AdminService.DeleteUser(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// ============================================
 // SESSIONS
 // ============================================
 

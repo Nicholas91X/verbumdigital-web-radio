@@ -199,6 +199,23 @@ export interface SubscriptionListResponse {
     subscriptions: SubscriptionEntry[];
 }
 
+// ============================================
+// ADMIN METRICS
+// ============================================
+
+export interface UserWithMetrics extends User {
+    subscription_count: number;
+    donation_count: number;
+    donation_total: number;
+    listening_minutes: number;
+}
+
+export interface SessionWithMetrics extends StreamingSession {
+    listener_count: number;
+    total_listen_secs: number;
+    bandwidth_mb: number;
+}
+
 export interface StreamURLResponse {
     church_id: number;
     church_name: string;

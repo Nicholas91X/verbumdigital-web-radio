@@ -7,6 +7,7 @@ import MachinesPage from '@/pages/MachinesPage';
 import ChurchesPage from '@/pages/ChurchesPage';
 import PriestsPage from '@/pages/PriestsPage';
 import SessionsPage from '@/pages/SessionsPage';
+import UsersPage from '@/pages/UsersPage';
 import type { ReactNode } from 'react';
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -45,6 +46,7 @@ export default function App() {
                         <Route path="/churches" element={<ChurchesPage />} />
                         <Route path="/priests" element={<PriestsPage />} />
                         <Route path="/sessions" element={<SessionsPage />} />
+                        <Route path="/users" element={<UsersPage />} />
                     </Route>
 
                     <Route path="*" element={<Navigate to="/" replace />} />

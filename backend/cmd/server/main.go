@@ -90,7 +90,7 @@ func main() {
 	// =====================
 	authHandler := handlers.NewAuthHandler(authService, cfg.JWTSecret, jwtExpHours)
 	priestHandler := handlers.NewPriestHandler(priestService)
-	userHandler := handlers.NewUserHandler(userService, notificationService)
+	userHandler := handlers.NewUserHandler(userService, notificationService, db)
 	adminHandler := handlers.NewAdminHandler(adminService)
 	deviceHandler := handlers.NewDeviceHandler(db, cfg.IcecastBaseURL, notificationService)
 	stripeHandler := handlers.NewStripeHandler(stripeService)
@@ -164,6 +164,8 @@ func main() {
 			admin.PUT("/priests/:id", adminHandler.UpdatePriest)
 			admin.DELETE("/priests/:id", adminHandler.DeletePriest)
 			admin.GET("/sessions", adminHandler.ListSessions)
+			admin.GET("/users", adminHandler.ListUsers)
+			admin.DELETE("/users/:id", adminHandler.DeleteUser)
 
 			// STRIPE ONBOARDING & DONATIONS
 			admin.POST("/churches/:id/stripe/onboard", stripeHandler.OnboardChurch)
@@ -204,6 +206,10 @@ func main() {
 
 			// DONATIONS HISTORY
 			user.GET("/donations", donationHandler.GetUserDonations)
+
+			// LISTENER TRACKING
+			user.POST("/listener/heartbeat", userHandler.ListenerHeartbeat)
+			user.DELETE("/listener/disconnect", userHandler.ListenerDisconnect)
 
 			// PUSH NOTIFICATIONS
 			user.POST("/push/subscribe", userHandler.PushSubscribe)
